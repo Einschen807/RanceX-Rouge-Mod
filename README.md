@@ -36,17 +36,13 @@ BGM 由常驻场景 `scenes/bgm_manager.tscn`（自动加载名 `BGM`）统一�
 - `scenes/encyclopedia_overlay.tscn` / `scripts/encyclopedia_overlay.gd`：同场景的百科叠加菜单、返回和焦点管理。
 - `scripts/encyclopedia_entry.gd`：三个百科入口及交互反馈。
 - `shaders/gaussian_blur.gdshader`：横向、纵向两次高斯卷积；中间使用 BackBufferCopy 保证两个方向都生效。
-- `assets/encyclopedia/asset_sources.json`：百科资源来源和裁切记录。
 - `scripts/title_audio.gd`：原版标题音效和背景音乐，按动画帧触发。
 - `scenes/bgm_manager.tscn` / `scripts/bgm_manager.gd`：全局唯一的 BGM 控制场景。
 - `scripts/original_flat_player.gd`：原版二维图层时间线播放器。
 - `assets/title/`：原版贴图与转出的时间线数据。
-- `assets/asset_sources.json`：贴图来源及图集裁剪位置。
-- `verification/`：真实 Godot 渲染截图和自动交互检查报告。
 
-新版动画预览见 `verification/标题动画预览.mp4`，逐帧左右对照见
-`verification/video_comparison/comparison.jpg`（每对左边原视频、右边 Godot）。
-这些文件用于核对效果，程序本身实时播放贴图和关键帧，并非播放录屏。
+项目目录只保留游戏源码、素材、配置、说明及正式程序。
+测试脚本、截图、对照视频、报告和素材来源清单统一放在项目外的 `F:\RanceX Slay The Spire\test`，不参与游戏运行。
 
 重新导出时选「Windows Desktop」。当前预设引用本机解包工具目录中的官方 Windows
 导出模板；换电脑后请安装匹配版本的 Godot 导出模板，并清空预设里的自定义模板路径。
