@@ -1,0 +1,14 @@
+{
+  "capture": "Godot MovieWriter real audio mix",
+  "cue_frame": 30,
+  "matched_audio_start_seconds": 1.0040416666666667,
+  "native_mix_correlation": 0.9966636300086975,
+  "mix_rmse": 0.008933963254094124,
+  "peak_before_cue": 0.0,
+  "output_peak": 0.6229767799377441,
+  "checks": [
+    "Silent before native cue",
+    "Original SFX and BGM present together",
+    "Mix is audible and does not clip"
+  ]
+}

@@ -1,0 +1,13 @@
+* text=auto
+*.gd text eol=lf
+*.gdshader text eol=lf
+*.tscn text eol=lf
+*.tres text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.png -text
+*.ogg -text
+verification/*.avi filter=lfs diff=lfs merge=lfs -text
+verification/*.mp4 filter=lfs diff=lfs merge=lfs -text
+verification/*.gif filter=lfs diff=lfs merge=lfs -text
+Rance.exe filter=lfs diff=lfs merge=lfs -text

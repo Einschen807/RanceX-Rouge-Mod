@@ -1,0 +1,94 @@
+[gd_scene load_steps=9 format=3]
+
+[ext_resource type="Script" path="res://scripts/title_screen.gd" id="1_title"]
+[ext_resource type="Script" path="res://scripts/original_flat_player.gd" id="2_flat"]
+[ext_resource type="Script" path="res://scripts/title_button.gd" id="3_button"]
+[ext_resource type="Script" path="res://scripts/title_audio.gd" id="4_audio"]
+[ext_resource type="PackedScene" path="res://scenes/encyclopedia_overlay.tscn" id="5_encyclopedia"]
+
+[sub_resource type="SystemFont" id="SystemFont_chinese"]
+font_names = PackedStringArray("Microsoft YaHei", "Noto Sans CJK SC")
+
+[sub_resource type="Theme" id="Theme_title"]
+default_font = SubResource("SystemFont_chinese")
+default_font_size = 24
+
+[sub_resource type="StyleBoxEmpty" id="Empty"]
+
+[node name="TitleScreen" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = SubResource("Theme_title")
+script = ExtResource("1_title")
+
+[node name="TitleAudio" type="Node" parent="."]
+script = ExtResource("4_audio")
+
+[node name="Background" type="Node2D" parent="."]
+script = ExtResource("2_flat")
+animation_path = "res://assets/title/background/animation.json"
+
+[node name="Logo" type="Node2D" parent="."]
+script = ExtResource("2_flat")
+animation_path = "res://assets/title/intro/animation.json"
+
+[node name="Actions" type="HBoxContainer" parent="."]
+layout_mode = 0
+anchor_left = 0.5
+anchor_top = 0.665
+anchor_right = 0.5
+anchor_bottom = 0.665
+offset_left = -310.0
+offset_right = 310.0
+offset_bottom = 200.0
+grow_horizontal = 2
+theme_override_constants/separation = 10
+alignment = 1
+
+[node name="NewGame" type="Button" parent="Actions"]
+custom_minimum_size = Vector2(200, 200)
+layout_mode = 2
+focus_neighbor_left = NodePath("../Encyclopedia")
+focus_neighbor_right = NodePath("../Continue")
+focus_neighbor_bottom = NodePath("../../Settings")
+script = ExtResource("3_button")
+label_text = "从头开始"
+
+[node name="Continue" type="Button" parent="Actions"]
+custom_minimum_size = Vector2(200, 200)
+layout_mode = 2
+focus_neighbor_left = NodePath("../NewGame")
+focus_neighbor_right = NodePath("../Encyclopedia")
+focus_neighbor_bottom = NodePath("../../Settings")
+script = ExtResource("3_button")
+label_text = "继续游戏"
+
+[node name="Encyclopedia" type="Button" parent="Actions"]
+custom_minimum_size = Vector2(200, 200)
+layout_mode = 2
+focus_neighbor_left = NodePath("../Continue")
+focus_neighbor_right = NodePath("../NewGame")
+focus_neighbor_bottom = NodePath("../../Settings")
+script = ExtResource("3_button")
+label_text = "百科大全"
+
+[node name="Settings" type="Button" parent="."]
+custom_minimum_size = Vector2(194, 90)
+layout_mode = 0
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = -100.0
+offset_right = 210.0
+offset_bottom = -10.0
+grow_vertical = 0
+focus_neighbor_top = NodePath("../Actions/NewGame")
+script = ExtResource("3_button")
+label_text = "设置"
+rectangular = true
+
+[node name="EncyclopediaOverlay" parent="." instance=ExtResource("5_encyclopedia")]

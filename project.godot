@@ -1,0 +1,26 @@
+; Godot 4.7.2 title-screen recreation.
+config_version=5
+
+[application]
+config/name="兰斯10 · 标题界面"
+run/main_scene="res://scenes/title_screen.tscn"
+config/features=PackedStringArray("4.7", "GL Compatibility")
+
+[autoload]
+BGM="*res://scenes/bgm_manager.tscn"
+
+[display]
+window/size/viewport_width=1920
+window/size/viewport_height=1080
+window/size/window_width_override=1280
+window/size/window_height_override=720
+window/size/min_width=960
+window/size/min_height=540
+window/stretch/mode="canvas_items"
+window/stretch/aspect="keep"
+
+[rendering]
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/default_filters/use_nearest_mipmap_filter=false
+environment/defaults/default_clear_color=Color(0.015, 0.018, 0.022, 1)
