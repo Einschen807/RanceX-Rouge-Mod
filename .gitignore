@@ -11,3 +11,7 @@ Thumbs.db
 # Local credentials/environment overrides
 .env
 .env.*
+
+/verification/
+/test/
+/verficiation/
