@@ -1,0 +1,137 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://scripts/encyclopedia_overlay.gd" id="1"]
+[ext_resource type="Shader" path="res://shaders/gaussian_blur.gdshader" id="2"]
+[ext_resource type="Script" path="res://scripts/encyclopedia_entry.gd" id="3"]
+[ext_resource type="Script" path="res://scripts/title_button.gd" id="4"]
+
+[sub_resource type="ShaderMaterial" id="Horizontal"]
+shader = ExtResource("2")
+shader_parameter/direction = Vector2(1, 0)
+
+[sub_resource type="ShaderMaterial" id="Vertical"]
+shader = ExtResource("2")
+shader_parameter/direction = Vector2(0, 1)
+
+[node name="EncyclopediaOverlay" type="Control"]
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1")
+
+[node name="BackgroundCopy" type="BackBufferCopy" parent="."]
+copy_mode = 2
+
+[node name="Horizontal" type="ColorRect" parent="."]
+material = SubResource("Horizontal")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="HorizontalCopy" type="BackBufferCopy" parent="."]
+copy_mode = 2
+
+[node name="Vertical" type="ColorRect" parent="."]
+material = SubResource("Vertical")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="Foreground" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="Heading" type="Label" parent="Foreground"]
+layout_mode = 0
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -250.0
+offset_top = -391.0
+offset_right = 250.0
+offset_bottom = -306.0
+theme_override_colors/font_color = Color(1, 0.86, 0.53, 1)
+theme_override_colors/font_shadow_color = Color(0.02, 0.01, 0, 1)
+theme_override_constants/shadow_offset_x = 3
+theme_override_constants/shadow_offset_y = 3
+theme_override_font_sizes/font_size = 46
+text = "百科大全"
+horizontal_alignment = 1
+vertical_alignment = 1
+mouse_filter = 2
+
+[node name="Entries" type="HBoxContainer" parent="Foreground"]
+layout_mode = 0
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -690.0
+offset_top = -280.0
+offset_right = 690.0
+offset_bottom = 290.0
+theme_override_constants/separation = 60
+alignment = 1
+mouse_filter = 2
+
+[node name="Cards" type="Button" parent="Foreground/Entries"]
+custom_minimum_size = Vector2(420, 570)
+layout_mode = 2
+focus_neighbor_left = NodePath("../Potions")
+focus_neighbor_right = NodePath("../Relics")
+focus_neighbor_bottom = NodePath("../../Back")
+script = ExtResource("3")
+entry_id = &"cards"
+title_text = "卡牌总览"
+description_text = "查看所有的卡牌"
+illustration = "cards"
+
+[node name="Relics" type="Button" parent="Foreground/Entries"]
+custom_minimum_size = Vector2(420, 570)
+layout_mode = 2
+focus_neighbor_left = NodePath("../Cards")
+focus_neighbor_right = NodePath("../Potions")
+focus_neighbor_bottom = NodePath("../../Back")
+script = ExtResource("3")
+entry_id = &"relics"
+title_text = "遗物收集"
+description_text = "检阅所有的遗物"
+illustration = "relics"
+
+[node name="Potions" type="Button" parent="Foreground/Entries"]
+custom_minimum_size = Vector2(420, 570)
+layout_mode = 2
+focus_neighbor_left = NodePath("../Relics")
+focus_neighbor_right = NodePath("../Cards")
+focus_neighbor_bottom = NodePath("../../Back")
+script = ExtResource("3")
+entry_id = &"potions"
+title_text = "药水研究所"
+description_text = "查看所有药水"
+illustration = "potions"
+
+[node name="Back" type="Button" parent="Foreground"]
+custom_minimum_size = Vector2(194, 90)
+layout_mode = 0
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = -100.0
+offset_right = 210.0
+offset_bottom = -10.0
+focus_neighbor_top = NodePath("../Entries/Cards")
+script = ExtResource("4")
+label_text = "返回"
+rectangular = true

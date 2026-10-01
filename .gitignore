@@ -1,0 +1,13 @@
+# Godot generated/editor caches
+.godot/
+.import/
+/export_templates/
+# Local output and session files
+/build/
+*.log
+.Rhistory
+.DS_Store
+Thumbs.db
+# Local credentials/environment overrides
+.env
+.env.*

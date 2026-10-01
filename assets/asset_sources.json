@@ -1,0 +1,440 @@
+[
+  {
+    "output": "assets/title/background/lib_1.png",
+    "source": "01_美术/01_主菜单与标题/标题界面UI/Flat内嵌图像/标题界面/シス/标题/背景.LIBL_1.ajp__Rance10Flat.png",
+    "source_entry": "标题界面\\シス／标题／背景.flat"
+  },
+  {
+    "output": "assets/title/background/lib_2.png",
+    "source": "01_美术/01_主菜单与标题/标题界面UI/Flat内嵌图像/标题界面/シス/标题/背景.LIBL_2.ajp__Rance10Flat.png",
+    "source_entry": "标题界面\\シス／标题／背景.flat"
+  },
+  {
+    "output": "assets/title/intro/lib_2.png",
+    "source": "01_美术/01_主菜单与标题/标题界面UI/Flat内嵌图像/标题界面/シス/标题/商标/点击前.LIBL_2.ajp__Rance10Flat.png",
+    "source_entry": "标题界面\\シス／标题／商标／点击前.flat"
+  },
+  {
+    "output": "assets/title/intro/lib_4.png",
+    "source": "01_美术/01_主菜单与标题/标题界面UI/Flat内嵌图像/标题界面/シス/标题/商标/点击前.LIBL_4.qnt__Rance10Flat.png",
+    "source_entry": "标题界面\\シス／标题／商标／点击前.flat"
+  },
+  {
+    "output": "assets/title/intro/atlas_0_0.png",
+    "source": "01_美术/01_主菜单与标题/标题界面UI/Flat内嵌图像/标题界面/シス/标题/商标/点击前.TALT_6.ajp__Rance10Flat.png",
+    "source_entry": "标题界面\\シス／标题／商标／点击前.flat",
+    "region": {
+      "name": "Ｇ／点阵.png",
+      "x": 0,
+      "y": 0,
+      "w": 5,
+      "h": 5
+    }
+  },
+  {
+    "output": "assets/title/intro/atlas_0_1.png",
+    "source": "01_美术/01_主菜单与标题/标题界面UI/Flat内嵌图像/标题界面/シス/标题/商标/点击前.TALT_6.ajp__Rance10Flat.png",
+    "source_entry": "标题界面\\シス／标题／商标／点击前.flat",
+    "region": {
+      "name": "下线.png",
+      "x": 32,
+      "y": 0,
+      "w": 616,
+      "h": 31
+    }
+  },
+  {
+    "output": "assets/title/intro/atlas_1_0.png",
+    "source": "01_美术/01_主菜单与标题/标题界面UI/Flat内嵌图像/标题界面/シス/标题/商标/点击前.TALT_7.qnt__Rance10Flat.png",
+    "source_entry": "标题界面\\シス／标题／商标／点击前.flat",
+    "region": {
+      "name": "Ｇ／商标／文字／Ｒａｎｃｅ.png",
+      "x": 0,
+      "y": 0,
+      "w": 844,
+      "h": 311
+    }
+  },
+  {
+    "output": "assets/title/intro/atlas_1_1.png",
+    "source": "01_美术/01_主菜单与标题/标题界面UI/Flat内嵌图像/标题界面/シス/标题/商标/点击前.TALT_7.qnt__Rance10Flat.png",
+    "source_entry": "标题界面\\シス／标题／商标／点击前.flat",
+    "region": {
+      "name": "Ｇ／商标／文字／TheLastRanceSeries.png",
+      "x": 0,
+      "y": 320,
+      "w": 226,
+      "h": 40
+    }
+  },
+  {
+    "output": "assets/title/intro/atlas_1_2.png",
+    "source": "01_美术/01_主菜单与标题/标题界面UI/Flat内嵌图像/标题界面/シス/标题/商标/点击前.TALT_7.qnt__Rance10Flat.png",
+    "source_entry": "标题界面\\シス／标题／商标／点击前.flat",
+    "region": {
+      "name": "Ｇ／商标／文字／决战.png",
+      "x": 0,
+      "y": 384,
+      "w": 957,
+      "h": 243
+    }
+  },
+  {
+    "output": "assets/title/intro/atlas_1_3.png",
+    "source": "01_美术/01_主菜单与标题/标题界面UI/Flat内嵌图像/标题界面/シス/标题/商标/点击前.TALT_7.qnt__Rance10Flat.png",
+    "source_entry": "标题界面\\シス／标题／商标／点击前.flat",
+    "region": {
+      "name": "Ｇ／送帧／炎_13.png",
+      "x": 0,
+      "y": 640,
+      "w": 469,
+      "h": 256
+    }
+  },
+  {
+    "output": "assets/title/intro/atlas_1_4.png",
+    "source": "01_美术/01_主菜单与标题/标题界面UI/Flat内嵌图像/标题界面/シス/标题/商标/点击前.TALT_7.qnt__Rance10Flat.png",
+    "source_entry": "标题界面\\シス／标题／商标／点击前.flat",
+    "region": {
+      "name": "Ｇ／送帧／炎_12.png",
+      "x": 480,
+      "y": 640,
+      "w": 469,
+      "h": 256
+    }
+  },
+  {
+    "output": "assets/title/intro/atlas_2_0.png",
+    "source": "01_美术/01_主菜单与标题/标题界面UI/Flat内嵌图像/标题界面/シス/标题/商标/点击前.TALT_8.ajp__Rance10Flat.png",
+    "source_entry": "标题界面\\シス／标题／商标／点击前.flat",
+    "region": {
+      "name": "Ｇ／送帧／炎_11.png",
+      "x": 0,
+      "y": 0,
+      "w": 469,
+      "h": 256
+    }
+  },
+  {
+    "output": "assets/title/intro/atlas_2_1.png",
+    "source": "01_美术/01_主菜单与标题/标题界面UI/Flat内嵌图像/标题界面/シス/标题/商标/点击前.TALT_8.ajp__Rance10Flat.png",
+    "source_entry": "标题界面\\シス／标题／商标／点击前.flat",
+    "region": {
+      "name": "Ｇ／送帧／炎_10.png",
+      "x": 480,
+      "y": 0,
+      "w": 469,
+      "h": 256
+    }
+  },
+  {
+    "output": "assets/title/intro/atlas_2_2.png",
+    "source": "01_美术/01_主菜单与标题/标题界面UI/Flat内嵌图像/标题界面/シス/标题/商标/点击前.TALT_8.ajp__Rance10Flat.png",
+    "source_entry": "标题界面\\シス／标题／商标／点击前.flat",
+    "region": {
+      "name": "Ｇ／送帧／炎_09.png",
+      "x": 0,
+      "y": 288,
+      "w": 469,
+      "h": 256
+    }
+  },
+  {
+    "output": "assets/title/intro/atlas_2_3.png",
+    "source": "01_美术/01_主菜单与标题/标题界面UI/Flat内嵌图像/标题界面/シス/标题/商标/点击前.TALT_8.ajp__Rance10Flat.png",
+    "source_entry": "标题界面\\シス／标题／商标／点击前.flat",
+    "region": {
+      "name": "Ｇ／送帧／炎_08.png",
+      "x": 480,
+      "y": 288,
+      "w": 469,
+      "h": 256
+    }
+  },
+  {
+    "output": "assets/title/intro/atlas_2_4.png",
+    "source": "01_美术/01_主菜单与标题/标题界面UI/Flat内嵌图像/标题界面/シス/标题/商标/点击前.TALT_8.ajp__Rance10Flat.png",
+    "source_entry": "标题界面\\シス／标题／商标／点击前.flat",
+    "region": {
+      "name": "Ｇ／送帧／炎_07.png",
+      "x": 0,
+      "y": 576,
+      "w": 469,
+      "h": 256
+    }
+  },
+  {
+    "output": "assets/title/intro/atlas_2_5.png",
+    "source": "01_美术/01_主菜单与标题/标题界面UI/Flat内嵌图像/标题界面/シス/标题/商标/点击前.TALT_8.ajp__Rance10Flat.png",
+    "source_entry": "标题界面\\シス／标题／商标／点击前.flat",
+    "region": {
+      "name": "Ｇ／送帧／炎_06.png",
+      "x": 480,
+      "y": 576,
+      "w": 469,
+      "h": 256
+    }
+  },
+  {
+    "output": "assets/title/intro/atlas_3_0.png",
+    "source": "01_美术/01_主菜单与标题/标题界面UI/Flat内嵌图像/标题界面/シス/标题/商标/点击前.TALT_9.ajp__Rance10Flat.png",
+    "source_entry": "标题界面\\シス／标题／商标／点击前.flat",
+    "region": {
+      "name": "Ｇ／送帧／炎_05.png",
+      "x": 0,
+      "y": 0,
+      "w": 469,
+      "h": 256
+    }
+  },
+  {
+    "output": "assets/title/intro/atlas_3_1.png",
+    "source": "01_美术/01_主菜单与标题/标题界面UI/Flat内嵌图像/标题界面/シス/标题/商标/点击前.TALT_9.ajp__Rance10Flat.png",
+    "source_entry": "标题界面\\シス／标题／商标／点击前.flat",
+    "region": {
+      "name": "Ｇ／送帧／炎_04.png",
+      "x": 480,
+      "y": 0,
+      "w": 469,
+      "h": 256
+    }
+  },
+  {
+    "output": "assets/title/intro/atlas_3_2.png",
+    "source": "01_美术/01_主菜单与标题/标题界面UI/Flat内嵌图像/标题界面/シス/标题/商标/点击前.TALT_9.ajp__Rance10Flat.png",
+    "source_entry": "标题界面\\シス／标题／商标／点击前.flat",
+    "region": {
+      "name": "Ｇ／送帧／炎_03.png",
+      "x": 0,
+      "y": 288,
+      "w": 469,
+      "h": 256
+    }
+  },
+  {
+    "output": "assets/title/intro/atlas_3_3.png",
+    "source": "01_美术/01_主菜单与标题/标题界面UI/Flat内嵌图像/标题界面/シス/标题/商标/点击前.TALT_9.ajp__Rance10Flat.png",
+    "source_entry": "标题界面\\シス／标题／商标／点击前.flat",
+    "region": {
+      "name": "Ｇ／送帧／炎_02.png",
+      "x": 480,
+      "y": 288,
+      "w": 469,
+      "h": 256
+    }
+  },
+  {
+    "output": "assets/title/intro/atlas_3_4.png",
+    "source": "01_美术/01_主菜单与标题/标题界面UI/Flat内嵌图像/标题界面/シス/标题/商标/点击前.TALT_9.ajp__Rance10Flat.png",
+    "source_entry": "标题界面\\シス／标题／商标／点击前.flat",
+    "region": {
+      "name": "Ｇ／送帧／炎_01.png",
+      "x": 0,
+      "y": 576,
+      "w": 469,
+      "h": 256
+    }
+  },
+  {
+    "output": "assets/title/intro/atlas_3_5.png",
+    "source": "01_美术/01_主菜单与标题/标题界面UI/Flat内嵌图像/标题界面/シス/标题/商标/点击前.TALT_9.ajp__Rance10Flat.png",
+    "source_entry": "标题界面\\シス／标题／商标／点击前.flat",
+    "region": {
+      "name": "Ｇ／送帧／炎.png",
+      "x": 480,
+      "y": 576,
+      "w": 469,
+      "h": 256
+    }
+  },
+  {
+    "output": "assets/title/idle/lib_1.png",
+    "source": "01_美术/01_主菜单与标题/标题界面UI/Flat内嵌图像/标题界面/シス/标题/商标/点击后.LIBL_1.qnt__Rance10Flat.png",
+    "source_entry": "标题界面\\シス／标题／商标／点击后.flat"
+  },
+  {
+    "output": "assets/title/idle/lib_2.png",
+    "source": "01_美术/01_主菜单与标题/标题界面UI/Flat内嵌图像/标题界面/シス/标题/商标/点击后.LIBL_2.ajp__Rance10Flat.png",
+    "source_entry": "标题界面\\シス／标题／商标／点击后.flat"
+  },
+  {
+    "output": "assets/title/round_normal/atlas_0_0.png",
+    "source": "01_美术/22_通用UI/共通素材UI/Flat内嵌图像/共通素材/シス/按钮/游戏开始/一般.TALT_0.ajp__Rance10Flat.png",
+    "source_entry": "共通素材\\シス／按钮／游戏开始／一般.flat",
+    "region": {
+      "name": "Ｇ／开始按钮／枠.png",
+      "x": 0,
+      "y": 0,
+      "w": 200,
+      "h": 200
+    }
+  },
+  {
+    "output": "assets/title/round_normal/atlas_0_1.png",
+    "source": "01_美术/22_通用UI/共通素材UI/Flat内嵌图像/共通素材/シス/按钮/游戏开始/一般.TALT_0.ajp__Rance10Flat.png",
+    "source_entry": "共通素材\\シス／按钮／游戏开始／一般.flat",
+    "region": {
+      "name": "Ｇ／一般.png",
+      "x": 224,
+      "y": 0,
+      "w": 154,
+      "h": 154
+    }
+  },
+  {
+    "output": "assets/title/settings_normal/atlas_0_0.png",
+    "source": "01_美术/22_通用UI/共通素材UI/Flat内嵌图像/共通素材/シス/按钮/ＭＥＮＵ/一般.TALT_0.ajp__Rance10Flat.png",
+    "source_entry": "共通素材\\シス／按钮／ＭＥＮＵ／一般.flat",
+    "region": {
+      "name": "Ｇ／按钮／一般.png",
+      "x": 0,
+      "y": 0,
+      "w": 176,
+      "h": 72
+    }
+  },
+  {
+    "output": "assets/title/settings_normal/atlas_0_1.png",
+    "source": "01_美术/22_通用UI/共通素材UI/Flat内嵌图像/共通素材/シス/按钮/ＭＥＮＵ/一般.TALT_0.ajp__Rance10Flat.png",
+    "source_entry": "共通素材\\シス／按钮／ＭＥＮＵ／一般.flat",
+    "region": {
+      "name": "Ｇ／按钮／ＭＥＮＵ.png",
+      "x": 192,
+      "y": 0,
+      "w": 100,
+      "h": 23
+    }
+  },
+  {
+    "output": "assets/title/settings_normal/atlas_0_2.png",
+    "source": "01_美术/22_通用UI/共通素材UI/Flat内嵌图像/共通素材/シス/按钮/ＭＥＮＵ/一般.TALT_0.ajp__Rance10Flat.png",
+    "source_entry": "共通素材\\シス／按钮／ＭＥＮＵ／一般.flat",
+    "region": {
+      "name": "Ｇ／按钮／一般枠.png",
+      "x": 320,
+      "y": 0,
+      "w": 187,
+      "h": 85
+    }
+  },
+  {
+    "output": "assets/title/round_hover/atlas_0_0.png",
+    "source": "01_美术/22_通用UI/共通素材UI/Flat内嵌图像/共通素材/シス/按钮/游戏开始/オン.TALT_0.ajp__Rance10Flat.png",
+    "source_entry": "共通素材\\シス／按钮／游戏开始／オン.flat",
+    "region": {
+      "name": "Ｇ／开始按钮／枠.png",
+      "x": 0,
+      "y": 0,
+      "w": 200,
+      "h": 200
+    }
+  },
+  {
+    "output": "assets/title/round_hover/atlas_0_1.png",
+    "source": "01_美术/22_通用UI/共通素材UI/Flat内嵌图像/共通素材/シス/按钮/游戏开始/オン.TALT_0.ajp__Rance10Flat.png",
+    "source_entry": "共通素材\\シス／按钮／游戏开始／オン.flat",
+    "region": {
+      "name": "Ｇ／オン.png",
+      "x": 224,
+      "y": 0,
+      "w": 154,
+      "h": 154
+    }
+  },
+  {
+    "output": "assets/title/settings_hover/atlas_0_0.png",
+    "source": "01_美术/22_通用UI/共通素材UI/Flat内嵌图像/共通素材/シス/按钮/ＭＥＮＵ/オン.TALT_0.ajp__Rance10Flat.png",
+    "source_entry": "共通素材\\シス／按钮／ＭＥＮＵ／オン.flat",
+    "region": {
+      "name": "Ｇ／按钮／オン.png",
+      "x": 0,
+      "y": 0,
+      "w": 176,
+      "h": 72
+    }
+  },
+  {
+    "output": "assets/title/settings_hover/atlas_0_1.png",
+    "source": "01_美术/22_通用UI/共通素材UI/Flat内嵌图像/共通素材/シス/按钮/ＭＥＮＵ/オン.TALT_0.ajp__Rance10Flat.png",
+    "source_entry": "共通素材\\シス／按钮／ＭＥＮＵ／オン.flat",
+    "region": {
+      "name": "Ｇ／按钮／ＭＥＮＵ.png",
+      "x": 192,
+      "y": 0,
+      "w": 100,
+      "h": 23
+    }
+  },
+  {
+    "output": "assets/title/settings_hover/atlas_0_2.png",
+    "source": "01_美术/22_通用UI/共通素材UI/Flat内嵌图像/共通素材/シス/按钮/ＭＥＮＵ/オン.TALT_0.ajp__Rance10Flat.png",
+    "source_entry": "共通素材\\シス／按钮／ＭＥＮＵ／オン.flat",
+    "region": {
+      "name": "Ｇ／按钮／一般枠.png",
+      "x": 320,
+      "y": 0,
+      "w": 187,
+      "h": 85
+    }
+  },
+  {
+    "output": "assets/title/round_down/atlas_0_0.png",
+    "source": "01_美术/22_通用UI/共通素材UI/Flat内嵌图像/共通素材/シス/按钮/游戏开始/DOWN.TALT_0.ajp__Rance10Flat.png",
+    "source_entry": "共通素材\\シス／按钮／游戏开始／DOWN.flat",
+    "region": {
+      "name": "Ｇ／开始按钮／枠.png",
+      "x": 0,
+      "y": 0,
+      "w": 200,
+      "h": 200
+    }
+  },
+  {
+    "output": "assets/title/round_down/atlas_0_1.png",
+    "source": "01_美术/22_通用UI/共通素材UI/Flat内嵌图像/共通素材/シス/按钮/游戏开始/DOWN.TALT_0.ajp__Rance10Flat.png",
+    "source_entry": "共通素材\\シス／按钮／游戏开始／DOWN.flat",
+    "region": {
+      "name": "Ｇ／オン.png",
+      "x": 224,
+      "y": 0,
+      "w": 154,
+      "h": 154
+    }
+  },
+  {
+    "output": "assets/title/settings_down/atlas_0_0.png",
+    "source": "01_美术/22_通用UI/共通素材UI/Flat内嵌图像/共通素材/シス/按钮/ＭＥＮＵ/DOWN.TALT_0.ajp__Rance10Flat.png",
+    "source_entry": "共通素材\\シス／按钮／ＭＥＮＵ／DOWN.flat",
+    "region": {
+      "name": "Ｇ／按钮／オン.png",
+      "x": 0,
+      "y": 0,
+      "w": 176,
+      "h": 72
+    }
+  },
+  {
+    "output": "assets/title/settings_down/atlas_0_1.png",
+    "source": "01_美术/22_通用UI/共通素材UI/Flat内嵌图像/共通素材/シス/按钮/ＭＥＮＵ/DOWN.TALT_0.ajp__Rance10Flat.png",
+    "source_entry": "共通素材\\シス／按钮／ＭＥＮＵ／DOWN.flat",
+    "region": {
+      "name": "Ｇ／按钮／ＭＥＮＵ.png",
+      "x": 192,
+      "y": 0,
+      "w": 100,
+      "h": 23
+    }
+  },
+  {
+    "output": "assets/title/settings_down/atlas_0_2.png",
+    "source": "01_美术/22_通用UI/共通素材UI/Flat内嵌图像/共通素材/シス/按钮/ＭＥＮＵ/DOWN.TALT_0.ajp__Rance10Flat.png",
+    "source_entry": "共通素材\\シス／按钮／ＭＥＮＵ／DOWN.flat",
+    "region": {
+      "name": "Ｇ／按钮／一般枠.png",
+      "x": 320,
+      "y": 0,
+      "w": 187,
+      "h": 85
+    }
+  }
+]
