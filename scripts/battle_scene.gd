@@ -53,6 +53,7 @@ func _ready() -> void:
 	_build_view()
 
 func _build_view() -> void:
+	battle.animate_automatic_skills = true
 	_build()
 	_presentation = BattlePresentation.new()
 	_presentation.view = self
@@ -438,6 +439,7 @@ func _start_battle() -> void:
 	input_locked = true
 	if battle.start():
 		await _presentation.round_start(false)
+		await _presentation.automatic_actions()
 	input_locked = false
 	_refresh()
 
@@ -482,6 +484,7 @@ func _end_turn() -> void:
 	battle.finish_enemy_turn()
 	if battle.phase == "player":
 		await _presentation.round_start(true)
+		await _presentation.automatic_actions()
 	input_locked = false
 	_refresh()
 

@@ -1,9 +1,8 @@
 extends Node2D
 class_name OriginalFlatPlayer
 signal frame_advanced(tick: int)
-## Plays the subset used by the original title: nested 2D graphics, frame
-## sequences, per-frame color/alpha, stop/jump scripts and additive blending.
-## No particle-emitter or general 3D-perspective conversion is claimed.
+## Native nested timelines, sprite sequences, ELK particles and blend modes.
+## Tilted planes are projected orthographically; no general 3D scene is needed.
 
 @export_file("*.json") var animation_path: String = ""
 @export var autoplay: bool = true
@@ -13,6 +12,8 @@ var hidden_libraries: PackedStringArray = []
 
 const MIX_SHADER: Shader = preload("res://shaders/flat_mix.gdshader")
 const ADD_SHADER: Shader = preload("res://shaders/flat_add.gdshader")
+const MULTIPLY_SHADER: Shader = preload("res://shaders/flat_multiply.gdshader")
+const SCREEN_SHADER: Shader = preload("res://shaders/flat_screen.gdshader")
 
 class LayerState:
 	extends RefCounted
@@ -83,9 +84,14 @@ func _make_layer(tracks: Array, parent: Node2D) -> LayerState:
 		var name_key: String = String(track["library"])
 		var lib: Dictionary = _libraries.get(name_key, {})
 		if int(lib.get("type", 2)) == 7:
-			# Native sprite timelines remain intact; battle supplies the sparkle emitter.
-			state.nodes.erase(i)
 			node.queue_free()
+			if lib.has("emitter"):
+				var emitter := FlatParticleEmitter.new()
+				parent.add_child(emitter)
+				emitter.configure(lib, track, self)
+				state.nodes[i] = emitter
+			else:
+				state.nodes.erase(i)
 			continue
 		if int(lib.get("type", 2)) == 5:
 			state.children[i] = _make_layer(lib["timelines"], node)
@@ -151,6 +157,8 @@ func is_finished() -> bool:
 	return _root != null and not _has_running_layer(_root)
 
 func is_root_finished() -> bool:
+	if _data.has("play_duration"):
+		return elapsed >= float(_data.play_duration)
 	return _root != null and _root.frame >= _root.end_frame
 
 func _has_running_layer(state: LayerState) -> bool:
@@ -187,13 +195,16 @@ func _process_scripts(state: LayerState) -> void:
 		if not jumped:
 			break
 
-func _render_layer(state: LayerState, alpha: float, multiply: Vector3, added: Vector3, inherited_filter: int) -> void:
+func _render_layer(state: LayerState, alpha: float, multiply: Vector3, added: Vector3, inherited_filter: int, ancestors: Array = [], parent_3d: Transform3D = Transform3D.IDENTITY) -> void:
 	for index: int in state.nodes:
 		var node: Node2D = state.nodes[index] as Node2D
 		var track: Dictionary = state.tracks[index]
 		var local: int = state.frame - int(track["begin"])
 		node.visible = local >= 0 and local < int(track["count"]) and String(track["library"]) not in hidden_libraries
 		if not node.visible:
+			continue
+		if node is FlatParticleEmitter:
+			node.render_frame(local, ancestors)
 			continue
 		var keys: Array = track["frames"][local]
 		assert(keys.size() <= 1, "Imported title tracks contain at most one key per frame")
@@ -202,15 +213,13 @@ func _render_layer(state: LayerState, alpha: float, multiply: Vector3, added: Ve
 			continue
 		var key: Dictionary = keys[0]
 		var scaling: Vector2 = Vector2(float(key["sx"]), float(key["sy"]))
+		var transform_3d := parent_3d
 		if project_tilt:
-			# Battle sprites use tilted planes; project their two local axes to 2D.
-			var rx := deg_to_rad(float(key["rx"]))
-			var ry := deg_to_rad(float(key["ry"]))
-			var rz := deg_to_rad(float(key["rz"]))
-			var axis_x := Vector2(cos(ry), 0).rotated(rz) * scaling.x
-			var axis_y := Vector2(sin(ry) * sin(rx), cos(rx)).rotated(rz) * scaling.y
-			var origin_3d := Vector2(float(key["ox"]), float(key["oy"]))
-			node.transform = Transform2D(axis_x, axis_y, Vector2(float(key["x"]), float(key["y"])) - axis_x * origin_3d.x - axis_y * origin_3d.y)
+			# Compose in 3D before projecting. Projecting each ancestor separately
+			# collapses planes turned 90 degrees even if their child rotates back.
+			transform_3d *= FlatParticleEmitter.key_transform(key)
+			node.top_level = true
+			node.global_transform = global_transform * Transform2D(Vector2(transform_3d.basis.x.x, transform_3d.basis.x.y), Vector2(transform_3d.basis.y.x, transform_3d.basis.y.y), Vector2(transform_3d.origin.x, transform_3d.origin.y))
 		else:
 			assert(is_zero_approx(float(key["rx"])) and is_zero_approx(float(key["ry"])), "3D rotation requires battle plane projection")
 			node.rotation = deg_to_rad(float(key["rz"]))
@@ -222,7 +231,7 @@ func _render_layer(state: LayerState, alpha: float, multiply: Vector3, added: Ve
 		var current_add: Vector3 = added + Vector3(float(key["add_r"]), float(key["add_g"]), float(key["add_b"])) / 255.0
 		var draw_filter: int = int(key["filter"]) if int(key["filter"]) != 0 else inherited_filter
 		if state.children.has(index):
-			_render_layer(state.children[index] as LayerState, current_alpha, current_mul, current_add, draw_filter)
+			_render_layer(state.children[index] as LayerState, current_alpha, current_mul, current_add, draw_filter, ancestors + [key], transform_3d)
 			continue
 		var texture_name: String = String(track["library"])
 		var lib: Dictionary = _libraries.get(texture_name, {})
@@ -250,18 +259,39 @@ func _render_layer(state: LayerState, alpha: float, multiply: Vector3, added: Ve
 		sprite.texture = texture
 		var alignment: int = clampi(int(key.get("align", 1)) - 1, 0, 8)
 		var ratio: Vector2 = Vector2(float(alignment % 3) * 0.5, float(int(alignment / 3.0)) * 0.5)
-		sprite.flip_h = bool(key["flip_x"])
-		sprite.flip_v = bool(key["flip_y"])
+		sprite.flip_h = not project_tilt and bool(key["flip_x"])
+		sprite.flip_v = not project_tilt and bool(key["flip_y"])
 		sprite.region_enabled = int(key["clip_w"]) > 0 and int(key["clip_h"]) > 0
 		if sprite.region_enabled:
 			sprite.region_rect = Rect2(float(key["clip_x"]), float(key["clip_y"]), float(key["clip_w"]), float(key["clip_h"]))
 		var drawn_size: Vector2 = sprite.region_rect.size if sprite.region_enabled else texture.get_size()
 		sprite.position = -drawn_size * ratio
 		var mat: ShaderMaterial = sprite.material as ShaderMaterial
-		mat.shader = ADD_SHADER if draw_filter == 1 else MIX_SHADER
+		mat.shader = shader_for_filter(draw_filter)
 		mat.set_shader_parameter("layer_alpha", current_alpha)
 		mat.set_shader_parameter("multiply_color", current_mul)
 		mat.set_shader_parameter("add_color", current_add)
+
+func shader_for_filter(filter: int) -> Shader:
+	match filter:
+		1: return ADD_SHADER
+		2: return MULTIPLY_SHADER
+		3: return SCREEN_SHADER
+	return MIX_SHADER
+
+func sequence_texture(library: String, frame: int) -> String:
+	var lib: Dictionary = _libraries.get(library, {})
+	if int(lib.get("type", 2)) != 6: return library
+	var sequence: Array = lib.sequence
+	var index := int(float(frame) / maxi(int(lib.span), 1))
+	match int(lib.loop):
+		0: index = mini(index, sequence.size() - 1)
+		1: index %= sequence.size()
+		2:
+			var period := maxi(1, sequence.size() * 2 - 2)
+			index %= period
+			if index >= sequence.size(): index = period - index
+	return str(sequence[index])
 
 func debug_state() -> Dictionary:
 	var child_frames: Array = []

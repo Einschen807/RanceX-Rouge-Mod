@@ -3,10 +3,6 @@ class_name BattlePresentation
 const CARD_MOVE_TIME := 0.16
 const ENEMY_TEMPO := 1.15
 ## Action presentation owns timing; BattleState still owns all combat arithmetic.
-const DEFAULT_EFFECTS := {
-	1: {"animation": "effect_melee", "sound": "attack_melee"},
-	2: {"animation": "effect_ranged", "sound": "attack_ranged"},
-}
 var view: BattleScene
 var layer: Control
 var _transients: Array[OriginalFlatPlayer] = []
@@ -30,13 +26,7 @@ func native(asset: String, at: Vector2 = Vector2.ZERO, rate: float = 1.0) -> Ori
 	return _native_path("res://assets/battle/native/%s/animation.json" % asset, at, rate)
 
 func _native_path(path: String, at: Vector2, rate: float = 1.0) -> OriginalFlatPlayer:
-	var effect: OriginalFlatPlayer
-	if path.contains("/effect_melee/") or path.contains("/effect_ranged/"):
-		var attack := BattleAttackEffect.new()
-		attack.ranged = path.contains("/effect_ranged/")
-		effect = attack
-	else:
-		effect = OriginalFlatPlayer.new()
+	var effect := OriginalFlatPlayer.new()
 	effect.project_tilt = true
 	effect.animation_path = path
 	effect.position = at
@@ -52,18 +42,11 @@ func _tween(rate: float = 1.0) -> Tween:
 	_tweens.append(tween)
 	return tween
 
-static func effect_for(skill: Dictionary) -> Dictionary:
-	var specified: String = skill.get("effect_asset", "")
-	if not specified.is_empty():
-		var path := "res://assets/effects/%s/animation.json" % specified
-		# An explicit asset owns its sound and must not also play a default.
-		if FileAccess.file_exists(path):
-			return {"path": path, "sound_path": "res://assets/effects/%s/audio.ogg" % specified}
-		return {}
-	return DEFAULT_EFFECTS.get(int(skill.type), {}).duplicate()
+static func effect_for(skill: Dictionary, element: int = 0) -> Dictionary:
+	return SkillEffectCatalog.resolve(skill, element)
 
 func _sound(path: String) -> void:
-	if not ResourceLoader.exists(path): return
+	if path.is_empty() or not ResourceLoader.exists(path): return
 	var voice := AudioStreamPlayer.new()
 	voice.stream = load(path)
 	voice.bus = &"SFX"
@@ -75,6 +58,7 @@ func _sound(path: String) -> void:
 	voice.play()
 
 func _impact_time(effect: OriginalFlatPlayer) -> float:
+	if effect._data.has("impact_time"): return float(effect._data.impact_time)
 	for track: Dictionary in effect._data.timelines:
 		for event: Dictionary in track.get("script", []):
 			for op: Array in event.ops:
@@ -135,7 +119,14 @@ func _banner(actor: String, skill: Dictionary, enemy: bool) -> Control:
 	text.pop()
 	return banner
 
-func action(actor: String, id: int, enemy := false, slot: int = -1) -> void:
+func automatic_actions() -> void:
+	while not view.battle.pending_automatic_skills.is_empty() and view.battle.phase == "player":
+		var entry: Dictionary = view.battle.pending_automatic_skills.pop_front()
+		var prepared := view.battle.prepare_automatic_skill(entry.actor, entry.id, entry.slot)
+		if prepared.get("ok", false): await action(entry.actor, entry.id, false, entry.slot, prepared)
+	view.battle.pending_automatic_skills.clear()
+
+func action(actor: String, id: int, enemy := false, slot: int = -1, automatic: Dictionary = {}) -> void:
 	# The queue animation has already played. A blocked action only records its skip.
 	if enemy and not view.battle.can_use_enemy_skill(id):
 		view.battle.use_enemy_skill(id)
@@ -144,35 +135,38 @@ func action(actor: String, id: int, enemy := false, slot: int = -1) -> void:
 	var rate := ENEMY_TEMPO if enemy else 1.0
 	var card: CardWidget
 	if not enemy:
-		view.show_ap_payment(actor, skill, slot if slot >= 0 else view.battle.skill_slot(actor, id))
+		if automatic.is_empty(): view.show_ap_payment(actor, skill, slot if slot >= 0 else view.battle.skill_slot(actor, id))
 		card = _card_lift(actor)
 	var banner := _banner(actor, skill, enemy)
 	await view._wait_animation((0.14 if enemy else CARD_MOVE_TIME) / rate)
-	var at := Vector2(960, 860 if enemy else 350)
-	var descriptor := effect_for(skill)
+	var attack := int(skill.type) in [1, 2, 3]
+	# Support effects belong to the acting side; offensive effects to its opponent.
+	var at := Vector2(960, 860 if enemy == attack else 350)
+	var element := 0 if enemy else int(view.battle.troop.catalog.find_name(actor).get("element", 0))
+	var descriptor := effect_for(skill, element)
 	var impact := 0.25
+	var duration := 0.0
 	if not descriptor.is_empty():
-		var effect: OriginalFlatPlayer
-		if descriptor.has("path"):
-			effect = _native_path(descriptor.path, at, rate)
-			_sound(descriptor.sound_path)
-		else:
-			effect = native(descriptor.animation, at, rate)
-			_sound("res://assets/audio/%s.ogg" % descriptor.sound)
+		var effect := _native_path(descriptor.path, at, rate)
+		_sound(descriptor.get("sound_path", ""))
 		impact = _impact_time(effect)
+		duration = float(effect._data.get("play_duration", float(effect._root.end_frame + 1) / effect.fps))
 	await view._wait_animation(impact / rate)
 	var before_enemy := view.battle.enemy_hp
 	var before_player := view.battle.player_hp
-	var result := view.battle.use_enemy_skill(id) if enemy else view.battle.use_player_skill(actor, id, slot)
+	var result: Dictionary
+	if not automatic.is_empty():
+		result = view.battle.apply_automatic_skill(actor, id, automatic)
+	else:
+		result = view.battle.use_enemy_skill(id) if enemy else view.battle.use_player_skill(actor, id, slot)
 	if result.ok:
 		var dealt := (before_player - view.battle.player_hp) if enemy else (before_enemy - view.battle.enemy_hp)
 		if dealt > 0:
-			_damage(dealt, at, rate)
-			if not descriptor.is_empty() and descriptor.has("animation"):
-				_sound("res://assets/audio/attack_damage.ogg")
+			_damage(dealt, Vector2(960, 860 if enemy else 350), rate)
+			_sound("res://assets/audio/attack_damage.ogg")
 		elif view.battle.player_hp > before_player:
 			_heal(view.battle.player_hp - before_player)
-	if not enemy: view.finish_ap_payment()
+	if not enemy and automatic.is_empty(): view.finish_ap_payment()
 	if is_instance_valid(card):
 		var down := _tween().set_parallel(true)
 		down.tween_property(card, "position:y", 730.0, CARD_MOVE_TIME).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
@@ -180,7 +174,8 @@ func action(actor: String, id: int, enemy := false, slot: int = -1) -> void:
 		down.chain().tween_callback(_finish_card_lift.bind(card))
 	await view._wait_animation(0.12 / rate)
 	banner.queue_free()
-	await view._wait_animation(0.55 / rate)
+	# Let long effects finish before the next actor starts, preserving their native tail.
+	await view._wait_animation(maxf(0.55, duration - impact - 0.12) / rate)
 
 func _damage(amount: float, at: Vector2, rate: float = 1.0) -> void:
 	native("damage_flash", at, rate)

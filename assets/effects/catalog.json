@@ -1,0 +1,272 @@
+{
+  "丸子": {
+    "path": "res://assets/effects/丸子/animation.json",
+    "sound_path": "res://assets/effects/丸子/audio.ogg",
+    "duration": 1.8333333333333333,
+    "impact": 1.2666666666666666
+  },
+  "偷盗攻击": {
+    "path": "res://assets/effects/偷盗攻击/animation.json",
+    "sound_path": "res://assets/effects/偷盗攻击/audio.ogg",
+    "duration": 1.4333333333333333,
+    "impact": 0.23333333333333334
+  },
+  "克劳森之手": {
+    "path": "res://assets/effects/克劳森之手/animation.json",
+    "sound_path": "res://assets/effects/克劳森之手/audio.ogg",
+    "duration": 1.0666666666666667,
+    "impact": 0.43333333333333335
+  },
+  "冰雹": {
+    "path": "res://assets/effects/冰雹/animation.json",
+    "sound_path": "res://assets/effects/冰雹/audio.ogg",
+    "duration": 2.6666666666666665,
+    "impact": 2.6
+  },
+  "冲击波": {
+    "path": "res://assets/effects/冲击波/animation.json",
+    "sound_path": "res://assets/effects/冲击波/audio.ogg",
+    "duration": 1.0333333333333334,
+    "impact": 0.6666666666666666
+  },
+  "净化": {
+    "path": "res://assets/effects/净化/animation.json",
+    "sound_path": "res://assets/effects/净化/audio.ogg",
+    "duration": 2.0,
+    "impact": 1.1
+  },
+  "吸入": {
+    "path": "res://assets/effects/吸入/animation.json",
+    "sound_path": "res://assets/effects/吸入/audio.ogg",
+    "duration": 1.5666666666666667,
+    "impact": 1.4666666666666666
+  },
+  "哈尼冲击波": {
+    "path": "res://assets/effects/哈尼冲击波/animation.json",
+    "sound_path": "res://assets/effects/哈尼冲击波/audio.ogg",
+    "duration": 1.1,
+    "impact": 0.7
+  },
+  "巨浪": {
+    "path": "res://assets/effects/巨浪/animation.json",
+    "sound_path": "res://assets/effects/巨浪/audio.ogg",
+    "duration": 2.5,
+    "impact": 2.4
+  },
+  "幻兽召喚": {
+    "path": "res://assets/effects/幻兽召喚/animation.json",
+    "sound_path": "res://assets/effects/幻兽召喚/audio.ogg",
+    "duration": 1.7,
+    "impact": 1.2
+  },
+  "式神": {
+    "path": "res://assets/effects/式神/animation.json",
+    "sound_path": "res://assets/effects/式神/audio.ogg",
+    "duration": 1.2333333333333334,
+    "impact": 0.8333333333333334
+  },
+  "御签": {
+    "path": "res://assets/effects/御签/animation.json",
+    "sound_path": "res://assets/effects/御签/audio.ogg",
+    "duration": 3.1666666666666665,
+    "impact": 2.533333333333333
+  },
+  "恐瘴气": {
+    "path": "res://assets/effects/恐瘴气/animation.json",
+    "sound_path": "res://assets/effects/恐瘴气/audio.ogg",
+    "duration": 3.1666666666666665,
+    "impact": 3.033333333333333
+  },
+  "手里剑": {
+    "path": "res://assets/effects/手里剑/animation.json",
+    "sound_path": "res://assets/effects/手里剑/audio.ogg",
+    "duration": 0.8333333333333334,
+    "impact": 0.5
+  },
+  "捕获攻击": {
+    "path": "res://assets/effects/捕获攻击/animation.json",
+    "sound_path": "res://assets/effects/捕获攻击/audio.ogg",
+    "duration": 1.1666666666666667,
+    "impact": 0.8333333333333334
+  },
+  "暗杀": {
+    "path": "res://assets/effects/暗杀/animation.json",
+    "sound_path": "res://assets/effects/暗杀/audio.ogg",
+    "duration": 0.8,
+    "impact": 0.23333333333333334
+  },
+  "极限值突破失败": {
+    "path": "res://assets/effects/极限值突破失败/animation.json",
+    "sound_path": "res://assets/effects/极限值突破失败/audio.ogg",
+    "duration": 1.0,
+    "impact": 0.16000000000000003
+  },
+  "极限值突破成功": {
+    "path": "res://assets/effects/极限值突破成功/animation.json",
+    "sound_path": "res://assets/effects/极限值突破成功/audio.ogg",
+    "duration": 0.7666666666666667,
+    "impact": 0.6133333333333334
+  },
+  "武舞乱舞": {
+    "path": "res://assets/effects/武舞乱舞/animation.json",
+    "sound_path": "res://assets/effects/武舞乱舞/audio.ogg",
+    "duration": 0.9666666666666667,
+    "impact": 0.6
+  },
+  "炮击": {
+    "path": "res://assets/effects/炮击/animation.json",
+    "sound_path": "res://assets/effects/炮击/audio.ogg",
+    "duration": 1.2,
+    "impact": 0.6
+  },
+  "突袭攻击": {
+    "path": "res://assets/effects/突袭攻击/animation.json",
+    "sound_path": "res://assets/effects/突袭攻击/audio.ogg",
+    "duration": 1.0333333333333334,
+    "impact": 0.6
+  },
+  "突袭攻击（大）": {
+    "path": "res://assets/effects/突袭攻击（大）/animation.json",
+    "sound_path": "res://assets/effects/突袭攻击（大）/audio.ogg",
+    "duration": 1.0333333333333334,
+    "impact": 0.6
+  },
+  "胃酸": {
+    "path": "res://assets/effects/胃酸/animation.json",
+    "sound_path": "res://assets/effects/胃酸/audio.ogg",
+    "duration": 3.533333333333333,
+    "impact": 3.433333333333333
+  },
+  "自爆": {
+    "path": "res://assets/effects/自爆/animation.json",
+    "sound_path": "res://assets/effects/自爆/audio.ogg",
+    "duration": 1.4666666666666666,
+    "impact": 0.7333333333333333
+  },
+  "负面效果": {
+    "path": "res://assets/effects/负面效果/animation.json",
+    "sound_path": "res://assets/effects/负面效果/audio.ogg",
+    "duration": 1.0,
+    "impact": 0.4666666666666667
+  },
+  "负面效果（大）": {
+    "path": "res://assets/effects/负面效果（大）/animation.json",
+    "sound_path": "res://assets/effects/负面效果（大）/audio.ogg",
+    "duration": 1.0,
+    "impact": 0.4666666666666667
+  },
+  "远程攻击": {
+    "path": "res://assets/effects/远程攻击/animation.json",
+    "sound_path": "res://assets/effects/远程攻击/audio.ogg",
+    "duration": 0.6666666666666666,
+    "impact": 0.4
+  },
+  "远程攻击（大）": {
+    "path": "res://assets/effects/远程攻击（大）/animation.json",
+    "sound_path": "res://assets/effects/远程攻击（大）/audio.ogg",
+    "duration": 0.7666666666666667,
+    "impact": 0.4
+  },
+  "附加效果": {
+    "path": "res://assets/effects/附加效果/animation.json",
+    "sound_path": "res://assets/effects/附加效果/audio.ogg",
+    "duration": 1.0,
+    "impact": 0.4666666666666667
+  },
+  "附加效果（大）": {
+    "path": "res://assets/effects/附加效果（大）/animation.json",
+    "sound_path": "res://assets/effects/附加效果（大）/audio.ogg",
+    "duration": 1.0,
+    "impact": 0.4666666666666667
+  },
+  "随心斩": {
+    "path": "res://assets/effects/随心斩/animation.json",
+    "sound_path": "res://assets/effects/随心斩/audio.ogg",
+    "duration": 0.9,
+    "impact": 0.7333333333333333
+  },
+  "雾": {
+    "path": "res://assets/effects/雾/animation.json",
+    "sound_path": "res://assets/effects/雾/audio.ogg",
+    "duration": 3.4,
+    "impact": 3.2333333333333334
+  },
+  "魔人无敌结界": {
+    "path": "res://assets/effects/魔人无敌结界/animation.json",
+    "sound_path": "res://assets/effects/魔人无敌结界/audio.ogg",
+    "duration": 1.0,
+    "impact": 0.16000000000000003
+  },
+  "魔人无敌结界破坏": {
+    "path": "res://assets/effects/魔人无敌结界破坏/animation.json",
+    "sound_path": "res://assets/effects/魔人无敌结界破坏/audio.ogg",
+    "duration": 0.7666666666666667,
+    "impact": 0.6133333333333334
+  },
+  "魔法／光魔法攻击": {
+    "path": "res://assets/effects/魔法／光魔法攻击/animation.json",
+    "sound_path": "res://assets/effects/魔法／光魔法攻击/audio.ogg",
+    "duration": 0.9666666666666667,
+    "impact": 0.5333333333333333
+  },
+  "魔法／光魔法攻击（大）": {
+    "path": "res://assets/effects/魔法／光魔法攻击（大）/animation.json",
+    "sound_path": "res://assets/effects/魔法／光魔法攻击（大）/audio.ogg",
+    "duration": 1.0,
+    "impact": 0.5333333333333333
+  },
+  "魔法／冰魔法攻击": {
+    "path": "res://assets/effects/魔法／冰魔法攻击/animation.json",
+    "sound_path": "res://assets/effects/魔法／冰魔法攻击/audio.ogg",
+    "duration": 1.5,
+    "impact": 0.8333333333333334
+  },
+  "魔法／冰魔法攻击（大）": {
+    "path": "res://assets/effects/魔法／冰魔法攻击（大）/animation.json",
+    "sound_path": "res://assets/effects/魔法／冰魔法攻击（大）/audio.ogg",
+    "duration": 1.4333333333333333,
+    "impact": 0.8333333333333334
+  },
+  "魔法／暗魔法攻击": {
+    "path": "res://assets/effects/魔法／暗魔法攻击/animation.json",
+    "sound_path": "res://assets/effects/魔法／暗魔法攻击/audio.ogg",
+    "duration": 0.9666666666666667,
+    "impact": 0.5666666666666667
+  },
+  "魔法／暗魔法攻击（大）": {
+    "path": "res://assets/effects/魔法／暗魔法攻击（大）/animation.json",
+    "sound_path": "res://assets/effects/魔法／暗魔法攻击（大）/audio.ogg",
+    "duration": 1.1333333333333333,
+    "impact": 0.5666666666666667
+  },
+  "魔法／炎魔法攻击": {
+    "path": "res://assets/effects/魔法／炎魔法攻击/animation.json",
+    "sound_path": "res://assets/effects/魔法／炎魔法攻击/audio.ogg",
+    "duration": 0.9333333333333333,
+    "impact": 0.4
+  },
+  "魔法／炎魔法攻击（大）": {
+    "path": "res://assets/effects/魔法／炎魔法攻击（大）/animation.json",
+    "sound_path": "res://assets/effects/魔法／炎魔法攻击（大）/audio.ogg",
+    "duration": 1.0,
+    "impact": 0.4
+  },
+  "魔法／雷魔法攻击": {
+    "path": "res://assets/effects/魔法／雷魔法攻击/animation.json",
+    "sound_path": "res://assets/effects/魔法／雷魔法攻击/audio.ogg",
+    "duration": 0.8333333333333334,
+    "impact": 0.7333333333333333
+  },
+  "魔法／雷魔法攻击（大）": {
+    "path": "res://assets/effects/魔法／雷魔法攻击（大）/animation.json",
+    "sound_path": "res://assets/effects/魔法／雷魔法攻击（大）/audio.ogg",
+    "duration": 1.0333333333333334,
+    "impact": 0.7333333333333333
+  },
+  "龙息": {
+    "path": "res://assets/effects/龙息/animation.json",
+    "sound_path": "res://assets/effects/龙息/audio.ogg",
+    "duration": 2.1333333333333333,
+    "impact": 1.5333333333333334
+  }
+}

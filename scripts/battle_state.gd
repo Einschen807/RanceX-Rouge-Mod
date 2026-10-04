@@ -25,6 +25,8 @@ var player_has_acted := false
 var intent: Dictionary = {}
 var outcome := ""
 var logs: Array[String] = []
+var animate_automatic_skills := false
+var pending_automatic_skills: Array[Dictionary] = []
 
 func configure(state: TroopState, monsters: MonsterCatalog, identity: String) -> void:
 	troop = state
@@ -157,6 +159,7 @@ func finish_enemy_turn() -> void:
 	_turn_start()
 
 func _turn_start() -> void:
+	pending_automatic_skills.clear()
 	log_message("Round %d" % round)
 	_choose_intent()
 	for name: String in troop.leaders:
@@ -168,12 +171,28 @@ func _turn_start() -> void:
 			if id == 0 or troop.catalog.skills[id].action != 2:
 				continue
 			var skill: Dictionary = troop.catalog.skills[id]
-			var result := runtime.use_skill(name, skill, context("player", card), slot)
-			if result.ok:
-				_apply("player", skill, result.commands)
-				log_message("%s 自动发动 %s" % [name, skill.name])
-				_check_result()
+			if animate_automatic_skills:
+				pending_automatic_skills.append({"actor": name, "id": id, "slot": slot})
+			else:
+				apply_automatic_skill(name, id, prepare_automatic_skill(name, id, slot))
 	changed.emit()
+
+func prepare_automatic_skill(actor: String, id: int, slot: int) -> Dictionary:
+	if phase != "player" or actor not in troop.leaders: return {"ok": false}
+	var card := troop.catalog.find_name(actor)
+	var skill: Dictionary = troop.catalog.skills[id]
+	if skill.action != 2: return {"ok": false}
+	# Roll once before animation; apply the resulting commands at its impact frame.
+	return runtime.use_skill(actor, skill, context("player", card), slot)
+
+func apply_automatic_skill(actor: String, id: int, result: Dictionary) -> Dictionary:
+	if result.get("ok", false):
+		var skill: Dictionary = troop.catalog.skills[id]
+		_apply("player", skill, result.commands)
+		log_message("%s 自动发动 %s" % [actor, skill.name])
+		_check_result()
+		changed.emit()
+	return result
 
 func _choose_intent() -> void:
 	intent = database.choose(monster.behavior, context("enemy"))
