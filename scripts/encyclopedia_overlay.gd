@@ -60,7 +60,10 @@ func _set_interactive(enabled: bool) -> void:
 		entry.disabled = not enabled
 	back.disabled = not enabled
 
-func _unhandled_input(event: InputEvent) -> void:
+func _input(event: InputEvent) -> void:
+	if get_tree().get_first_node_in_group("modal_overlay") != null or is_instance_valid(get_node("/root/BattleManager").active):
+		return
 	if active and event.is_action_pressed("ui_cancel"):
-		close_requested.emit()
 		get_viewport().set_input_as_handled()
+		get_node("/root/UIAudio").play("cancel")
+		close_requested.emit()

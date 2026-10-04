@@ -15,6 +15,7 @@ var _tween: Tween
 var _kind: String = "round"
 
 func _ready() -> void:
+	get_node("/root/UIAudio").bind_button(self, "cancel" if label_text == "返回" else "click")
 	text = ""
 	_kind = "settings" if rectangular else "round"
 	for state: String in ["normal", "hover", "pressed", "focus", "disabled"]:

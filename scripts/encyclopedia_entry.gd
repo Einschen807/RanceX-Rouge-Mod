@@ -15,6 +15,7 @@ var feedback_count: int = 0
 var _tween: Tween
 
 func _ready() -> void:
+	get_node("/root/UIAudio").bind_button(self)
 	text = ""
 	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	for state: String in ["normal", "hover", "pressed", "focus", "disabled"]:

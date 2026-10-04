@@ -8,6 +8,11 @@ config/features=PackedStringArray("4.7", "GL Compatibility")
 
 [autoload]
 BGM="*res://scenes/bgm_manager.tscn"
+UIAudio="*res://scripts/ui_audio.gd"
+Settings="*res://scripts/shared_settings.gd"
+BattleManager="*res://scripts/battle_manager.gd"
+DebugConsole="*res://scripts/debug_console.gd"
+ScreenTransition="*res://scripts/screen_transition.gd"
 
 [display]
 window/size/viewport_width=1920
@@ -18,6 +23,12 @@ window/size/min_width=960
 window/size/min_height=540
 window/stretch/mode="canvas_items"
 window/stretch/aspect="keep"
+
+[input]
+ui_cancel={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"keycode":4194305), Object(InputEventMouseButton,"button_index":2)]
+}
 
 [rendering]
 renderer/rendering_method="gl_compatibility"

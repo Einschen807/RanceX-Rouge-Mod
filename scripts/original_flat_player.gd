@@ -7,6 +7,9 @@ signal frame_advanced(tick: int)
 
 @export_file("*.json") var animation_path: String = ""
 @export var autoplay: bool = true
+var playback_speed := 1.0
+var project_tilt := false
+var hidden_libraries: PackedStringArray = []
 
 const MIX_SHADER: Shader = preload("res://shaders/flat_mix.gdshader")
 const ADD_SHADER: Shader = preload("res://shaders/flat_add.gdshader")
@@ -52,7 +55,6 @@ func load_animation(path: String) -> void:
 	_reported_missing.clear()
 	for lib: Dictionary in _data["libraries"]:
 		_libraries[String(lib["name"])] = lib
-		assert(int(lib["type"]) != 7, "Particle library is outside the title player's scope")
 	for key: String in _data["textures"]:
 		_textures[key] = load(String(_data["textures"][key])) as Texture2D
 	fps = float(_data["fps"])
@@ -80,6 +82,11 @@ func _make_layer(tracks: Array, parent: Node2D) -> LayerState:
 		state.nodes[i] = node
 		var name_key: String = String(track["library"])
 		var lib: Dictionary = _libraries.get(name_key, {})
+		if int(lib.get("type", 2)) == 7:
+			# Native sprite timelines remain intact; battle supplies the sparkle emitter.
+			state.nodes.erase(i)
+			node.queue_free()
+			continue
 		if int(lib.get("type", 2)) == 5:
 			state.children[i] = _make_layer(lib["timelines"], node)
 		else:
@@ -95,8 +102,8 @@ func _make_layer(tracks: Array, parent: Node2D) -> LayerState:
 func _process(delta: float) -> void:
 	if _root == null or not autoplay:
 		return
-	elapsed += delta
-	_clock += minf(delta, 0.5)
+	elapsed += delta * playback_speed
+	_clock += minf(delta, 0.5) * playback_speed
 	var step: float = 1.0 / fps
 	while _clock >= step:
 		_clock -= step
@@ -185,7 +192,7 @@ func _render_layer(state: LayerState, alpha: float, multiply: Vector3, added: Ve
 		var node: Node2D = state.nodes[index] as Node2D
 		var track: Dictionary = state.tracks[index]
 		var local: int = state.frame - int(track["begin"])
-		node.visible = local >= 0 and local < int(track["count"])
+		node.visible = local >= 0 and local < int(track["count"]) and String(track["library"]) not in hidden_libraries
 		if not node.visible:
 			continue
 		var keys: Array = track["frames"][local]
@@ -195,11 +202,21 @@ func _render_layer(state: LayerState, alpha: float, multiply: Vector3, added: Ve
 			continue
 		var key: Dictionary = keys[0]
 		var scaling: Vector2 = Vector2(float(key["sx"]), float(key["sy"]))
-		assert(is_zero_approx(float(key["rx"])) and is_zero_approx(float(key["ry"])), "3D rotation is not present in the imported title")
-		node.rotation = deg_to_rad(float(key["rz"]))
-		node.scale = scaling
-		var origin: Vector2 = Vector2(float(key["ox"]), float(key["oy"]))
-		node.position = Vector2(float(key["x"]), float(key["y"])) - (origin * scaling).rotated(node.rotation)
+		if project_tilt:
+			# Battle sprites use tilted planes; project their two local axes to 2D.
+			var rx := deg_to_rad(float(key["rx"]))
+			var ry := deg_to_rad(float(key["ry"]))
+			var rz := deg_to_rad(float(key["rz"]))
+			var axis_x := Vector2(cos(ry), 0).rotated(rz) * scaling.x
+			var axis_y := Vector2(sin(ry) * sin(rx), cos(rx)).rotated(rz) * scaling.y
+			var origin_3d := Vector2(float(key["ox"]), float(key["oy"]))
+			node.transform = Transform2D(axis_x, axis_y, Vector2(float(key["x"]), float(key["y"])) - axis_x * origin_3d.x - axis_y * origin_3d.y)
+		else:
+			assert(is_zero_approx(float(key["rx"])) and is_zero_approx(float(key["ry"])), "3D rotation requires battle plane projection")
+			node.rotation = deg_to_rad(float(key["rz"]))
+			node.scale = scaling
+			var origin: Vector2 = Vector2(float(key["ox"]), float(key["oy"]))
+			node.position = Vector2(float(key["x"]), float(key["y"])) - (origin * scaling).rotated(node.rotation)
 		var current_alpha: float = alpha * float(key["alpha"]) / 255.0
 		var current_mul: Vector3 = multiply * Vector3(float(key["mul_r"]), float(key["mul_g"]), float(key["mul_b"])) / 255.0
 		var current_add: Vector3 = added + Vector3(float(key["add_r"]), float(key["add_g"]), float(key["add_b"])) / 255.0
