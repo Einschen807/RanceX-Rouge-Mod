@@ -9,6 +9,7 @@ config/features=PackedStringArray("4.7", "GL Compatibility")
 [autoload]
 BGM="*res://scenes/bgm_manager.tscn"
 UIAudio="*res://scripts/ui_audio.gd"
+RunAutosave="*res://scripts/run_autosave.gd"
 Settings="*res://scripts/shared_settings.gd"
 BattleManager="*res://scripts/battle_manager.gd"
 DebugConsole="*res://scripts/debug_console.gd"

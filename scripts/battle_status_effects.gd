@@ -17,7 +17,8 @@ const SHOCK := 20
 const INFORMATION_BLOCK := 21
 const DEATH_COUNTDOWN := 22
 const LETHAL_WOUND := 23
-const NAMES := ["燃烧", "混乱", "虚弱", "毒", "诅咒", "黑暗", "反再生", "恐怖", "沉睡", "冰冻", "触电", "信息阻断", "即死预告", "致命伤"]
+const PURITY := 24
+const NAMES := ["燃烧", "混乱", "虚弱", "毒", "诅咒", "黑暗", "反再生", "恐怖", "沉睡", "冰冻", "触电", "信息阻断", "即死预告", "致命伤", "纯净"]
 const DESCRIPTIONS := [
 	"受到炎属性攻击时，伤害增加50%。",
 	"每次己方回合开始时，随机封锁一个可用行动。",
@@ -33,10 +34,11 @@ const DESCRIPTIONS := [
 	"HP、伤害数值与伤害预测无法显示。",
 	"剩余回合归零时，HP变为0。",
 	"攻击力降低50%。",
+	"附加时清除其他异常。不会自然减少；每阻挡一次其他异常附加消耗1层。重复附加叠加，上限9层。",
 ]
 
 static func valid(id: int) -> bool:
-	return id >= BURN and id <= LETHAL_WOUND
+	return id >= BURN and id <= PURITY
 
 static func valid_value(value: int) -> bool:
 	return value in range(1, 10) or value in range(11, 20)

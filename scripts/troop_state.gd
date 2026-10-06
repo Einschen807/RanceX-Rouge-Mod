@@ -13,6 +13,11 @@ var damage_rates := {"physical": 0.0, "magic": 0.0}
 var resistance_rates := {"physical": 0.0, "magic": 0.0}
 var bonus_points := 0
 var encyclopedia_mode := false
+## Battle-only DOWN records; do not affect deployment AT or owned faction stats.
+var down_cards: Dictionary = {}
+## Original battle replacement excludes every card of a retired character.
+var retired_characters: Dictionary = {}
+var battle_active := false
 var skill_runtime := SkillRuntime.new()
 const DEPLOYMENT_ORDER := [3, 2, 4, 1, 5, 0, 6]
 const BONUS_NAMES := ["增加领队格子 +1", "增加领队格子 +1", "增加领队格子 +1", "AP最大值强化 6→10", "AP恢复强化 偶数回合+1", "更换领队", "神魔阵营解禁", "强化出现概率 +100%", "HP增加 +30%", "物理伤害增加 +30%", "魔法伤害增加 +30%", "哈尼打火机", "全面强化 +3%", "全面强化 +3%", "上限解除 +25%", "上限解除 +25%"]
@@ -78,12 +83,17 @@ func deploy(display_name: String) -> bool:
 	var slot := deployment_slot(display_name)
 	if slot < 0:
 		return false
+	var previous := leaders[slot]
+	if battle_active:
+		if not previous.is_empty() and catalog.find_name(previous).identity != catalog.find_name(display_name).identity:
+			retired_characters[catalog.find_name(previous).identity] = true
+		skill_runtime.acted[display_name] = true
 	leaders[slot] = display_name
 	changed.emit()
 	return true
 
 func deployment_slot(display_name: String) -> int:
-	if not has_card(display_name):
+	if not has_card(display_name) or is_unavailable(display_name):
 		return -1
 	var faction: int = catalog.find_name(display_name).faction
 	var previous := leader_for_faction(faction)
@@ -93,6 +103,9 @@ func deployment_slot(display_name: String) -> int:
 		if leaders[slot].is_empty():
 			return slot
 	return -1
+
+func is_unavailable(display_name: String) -> bool:
+	return down_cards.has(display_name) or retired_characters.has(catalog.find_name(display_name).get("identity", ""))
 
 func move_leader(display_name: String, target: int) -> bool:
 	var source := leaders.find(display_name)
@@ -107,6 +120,8 @@ func move_leader(display_name: String, target: int) -> bool:
 func remove(display_name: String) -> void:
 	var slot := leaders.find(display_name)
 	if slot >= 0:
+		if battle_active:
+			retired_characters[catalog.find_name(display_name).identity] = true
 		leaders[slot] = ""
 		changed.emit()
 

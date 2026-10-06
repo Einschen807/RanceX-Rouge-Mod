@@ -120,7 +120,7 @@ func _finish_card_lift(card: CardWidget) -> void:
 		card.queue_free()
 	view.set_lifted_actor("")
 
-func _banner(actor: String, skill: Dictionary, enemy: bool) -> Control:
+func _banner(actor: String, skill: Dictionary, enemy: bool, support := false) -> Control:
 	var banner := Control.new()
 	banner.name = "ActionBanner"
 	banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -140,9 +140,9 @@ func _banner(actor: String, skill: Dictionary, enemy: bool) -> Control:
 	banner.add_child(text)
 	text.push_paragraph(HORIZONTAL_ALIGNMENT_CENTER)
 	text.push_color(Color("ee9292") if enemy else Color("86cce6"))
-	text.add_text(view.battle.monster.name if enemy else str(view.battle.troop.catalog.find_name(actor).identity))
+	text.add_text(view.battle.monster.name if enemy else ("联合部队" if support else str(view.battle.troop.catalog.find_name(actor).get("identity", actor))))
 	text.pop()
-	text.add_text("使用")
+	text.add_text("发动" if support else "使用")
 	text.push_color(Color("ffe345"))
 	text.add_text(skill.name)
 	text.pop()
@@ -151,11 +151,44 @@ func _banner(actor: String, skill: Dictionary, enemy: bool) -> Control:
 	return banner
 
 func automatic_actions() -> void:
+	await support_actions("player")
 	while not view.battle.pending_automatic_skills.is_empty() and view.battle.phase == "player":
 		var entry: Dictionary = view.battle.pending_automatic_skills.pop_front()
 		var prepared := view.battle.prepare_automatic_skill(entry.actor, entry.id, entry.slot)
 		if prepared.get("ok", false): await action(entry.actor, entry.id, false, entry.slot, prepared)
 	view.battle.pending_automatic_skills.clear()
+
+func support_actions(side: String) -> void:
+	while not view.battle.pending_support_skills.is_empty() and view.battle.phase == side:
+		var entry: Dictionary = view.battle.pending_support_skills.pop_front()
+		if entry.side != side: continue
+		var prepared := BattleSupports.prepare(view.battle, side, entry.uid)
+		if not prepared.get("ok", false): continue
+		prepared.support_action = true
+		prepared.support_uid = entry.uid
+		var name := "支援"
+		for support: Dictionary in BattleSupports.group(view.battle, side):
+			if support.uid == entry.uid: name = BattleSupports.definition(view.battle, support).name
+		await action(name, entry.id, side == "enemy", -1, prepared)
+		await support_feedback()
+
+func support_feedback() -> void:
+	while not view.battle.pending_support_feedback.is_empty():
+		var entry: Dictionary = view.battle.pending_support_feedback.pop_front()
+		var at := Vector2(960, 860 if entry.side == "player" else 350)
+		var event: String = entry.event
+		var asset := "support_explode" if event == "explode" else event
+		var effect := native(asset, at)
+		if event == "barrier_block":
+			# The native barrier root stops on frame 4; its owner retires it.
+			effect.set_meta("lifetime", 0.6)
+			var fade := _tween()
+			fade.tween_interval(0.4)
+			fade.tween_property(effect, "modulate:a", 0.0, 0.2)
+		_sound("res://assets/audio/%s.ogg" % asset)
+		if event == "explode" and float(entry.damage) > 0.0:
+			_damage(float(entry.damage), at)
+			await view._wait_animation(0.2)
 
 static func command_steps(commands: Array) -> Array[Array]:
 	# One attack per step. Other commands keep their original order and run once.
@@ -182,18 +215,22 @@ func _skill_effect(descriptor: Dictionary, at: Vector2, rate: float) -> Dictiona
 	return timing
 
 func action(actor: String, id: int, enemy := false, slot: int = -1, automatic: Dictionary = {}) -> void:
+	var support_action: bool = automatic.get("support_action", false)
 	# The queue animation has already played. A blocked action only records its skip.
-	if enemy and not view.battle.can_use_enemy_skill(id):
+	if enemy and not support_action and not view.battle.can_use_enemy_skill(id):
 		view.battle.use_enemy_skill(id)
 		return
 	var skill: Dictionary = view.battle.troop.catalog.skills[id]
 	var rate := ENEMY_TEMPO if enemy else 1.0
+	if support_action:
+		for bar: BattleSupportBar in view._support_bars:
+			if bar.side == ("enemy" if enemy else "player"): bar.activate(int(automatic.support_uid))
 	var card: CardWidget
-	if not enemy:
+	if not enemy and not support_action:
 		if automatic.is_empty(): view.show_ap_payment(actor, skill, slot if slot >= 0 else view.battle.skill_slot(actor, id))
 		card = _card_lift(actor)
-	var banner := _banner(actor, skill, enemy)
-	await view._wait_animation((0.14 if enemy else CARD_MOVE_TIME) / rate)
+	var banner := _banner(actor, skill, enemy, support_action)
+	await view._wait_animation(0.2 if support_action else (0.14 if enemy else CARD_MOVE_TIME) / rate)
 	var forecast := BattleForecast.action(view.battle, actor, id, enemy, slot, automatic)
 	if get_node("/root/Settings").should_play_cut_in(not enemy and forecast.lethal):
 		await _play_cut_in(skill)
@@ -228,9 +265,13 @@ func action(actor: String, id: int, enemy := false, slot: int = -1, automatic: D
 				await view._wait_animation(float(timing.impact) / effect_rate)
 			var before_enemy := view.battle.enemy_hp
 			var before_player := view.battle.player_hp
+			var feedback_before := view.battle.pending_support_feedback.size()
 			view.battle.apply_skill_commands("enemy" if enemy else "player", id, steps[index], index == steps.size() - 1)
 			for target_side: String in ["enemy", "player"]:
 				var dealt := (before_player - view.battle.player_hp) if target_side == "player" else (before_enemy - view.battle.enemy_hp)
+				for feedback_index: int in range(feedback_before, view.battle.pending_support_feedback.size()):
+					var feedback: Dictionary = view.battle.pending_support_feedback[feedback_index]
+					if feedback.event == "explode" and feedback.side == target_side: dealt -= float(feedback.damage)
 				if dealt > 0:
 					_damage(dealt, Vector2(960, 860 if target_side == "player" else 350), rate, multi_hit)
 					_sound("res://assets/audio/attack_damage.ogg")
@@ -239,6 +280,7 @@ func action(actor: String, id: int, enemy := false, slot: int = -1, automatic: D
 			for command: Dictionary in steps[index]:
 				if command.get("miss", false):
 					_miss(Vector2(960, 860 if enemy else 350), rate)
+			await support_feedback()
 			if index == 0:
 				# The actor returns after the first impact; remaining strikes are one action.
 				_return_card(card)
@@ -309,6 +351,7 @@ func _miss(at: Vector2, rate: float) -> void:
 	tween.tween_property(effect, "modulate:a", 0.0, 0.25)
 
 func status_feedback() -> void:
+	await support_feedback()
 	while not view.battle.pending_status_feedback.is_empty():
 		var event: Dictionary = view.battle.pending_status_feedback.pop_front()
 		if float(event.damage) > 0.0:
@@ -360,9 +403,38 @@ func round_start(show_player_turn: bool) -> void:
 	fade.tween_property(title, "modulate:a", 0.0, 0.5)
 	await view._wait_animation(1.8)
 	title.queue_free()
+	await down_replacements()
 	if show_player_turn:
 		native("player_turn")
 		await view._wait_animation(0.8)
+
+func down_replacements() -> void:
+	while not view.battle.pending_down_replacements.is_empty():
+		var entry: Dictionary = view.battle.pending_down_replacements.pop_front()
+		if view.battle.troop.leaders[int(entry.slot)] != entry.actor: continue
+		view.set_lifted_actor(entry.actor)
+		var card := CardWidget.new()
+		card.name = "EnteringLeader"
+		card.setup(view.battle.troop.catalog.find_name(entry.actor), view.battle.troop, false, 0)
+		card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		card.pivot_offset = Vector2(104,156)
+		card.scale = Vector2.ONE * 1.2
+		card.position = Vector2(200 + int(entry.slot)*218,930)
+		layer.add_child(card)
+		for decoration: String in ["LeaderBadge", "LeaderGlow"]:
+			if card.visual.has_node(decoration): card.visual.get_node(decoration).hide()
+		# Original HastleMotion: rise 200px/150ms, hold 500ms, then
+		# fade and shrink 1.2 -> 1.0 over 150ms; reveal the slot at 650ms.
+		var entrance := _tween()
+		entrance.tween_property(card,"position:y",730.0,0.15).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		entrance.tween_interval(0.5)
+		entrance.tween_callback(view.set_lifted_actor.bind(""))
+		entrance.tween_property(card,"modulate:a",0.0,0.15)
+		entrance.parallel().tween_property(card,"scale",Vector2.ONE,0.15).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		await entrance.finished
+		card.hide()
+		layer.remove_child(card)
+		card.queue_free()
 
 func _exit_tree() -> void:
 	for voice: AudioStreamPlayer in _voices:

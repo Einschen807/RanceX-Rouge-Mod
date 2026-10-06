@@ -11,6 +11,8 @@ var project_tilt := false
 var hidden_libraries: PackedStringArray = []
 ## Native status application replaces the placeholder icon without changing its timeline.
 var texture_overrides: Dictionary = {}
+## Native UI hover tint, inherited by every nested timeline.
+var tint_add := Vector3.ZERO
 
 const MIX_SHADER: Shader = preload("res://shaders/flat_mix.gdshader")
 const ADD_SHADER: Shader = preload("res://shaders/flat_add.gdshader")
@@ -69,7 +71,7 @@ func load_animation(path: String) -> void:
 	_root = _make_layer(_data["timelines"], self)
 	_activate_layer(_root)
 	_process_scripts(_root)
-	_render_layer(_root, 1.0, Vector3.ONE, Vector3.ZERO, 0)
+	_render_layer(_root, 1.0, Vector3.ONE, tint_add, 0)
 
 func _make_layer(tracks: Array, parent: Node2D) -> LayerState:
 	var state: LayerState = LayerState.new()
@@ -119,7 +121,7 @@ func _process(delta: float) -> void:
 		_clock -= step
 		_tick_layer(_root)
 		ticks += 1
-	_render_layer(_root, 1.0, Vector3.ONE, Vector3.ZERO, 0)
+	_render_layer(_root, 1.0, Vector3.ONE, tint_add, 0)
 	frame_advanced.emit(ticks)
 
 func _tick_layer(state: LayerState) -> void:

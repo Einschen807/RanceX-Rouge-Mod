@@ -64,7 +64,7 @@ offset_bottom = 390.0
 mouse_filter = 2
 
 [node name="Voice" type="AudioStreamPlayer" parent="."]
-bus = &"SFX"
+bus = &"Voice"
 
 [node name="AnimationPlayer" type="AnimationPlayer" parent="."]
 callback_mode_method = 0

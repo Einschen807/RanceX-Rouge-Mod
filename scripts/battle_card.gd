@@ -50,7 +50,7 @@ func _ready() -> void:
 	var at := BattleArt.label(self, str(int(floor(battle.troop.deployed(card, "at")))), Vector2(3, 206 if mode == 0 else 270), Vector2(202, 34), 28, Color(1, 0.98, 0.82), HORIZONTAL_ALIGNMENT_CENTER)
 	at.name = "BattleAT"
 	var acted: bool = battle.runtime.acted.get(card.name, false)
-	if acted:
+	if acted and not battle.troop.down_cards.has(card.name):
 		var shade := ColorRect.new()
 		shade.size = size
 		shade.color = Color(0, 0, 0, 0.68)
@@ -77,6 +77,11 @@ func _ready() -> void:
 		var stun := BattleArt.flat(self, "status_blocked_card")
 		stun.name = "ConfusionStun"
 		stun.z_index = 21
+	if battle.troop.down_cards.has(card.name):
+		var down := BattleArt.flat(self, "down_overlay")
+		down.name = "DownState"
+		# Keep DOWN in this card's draw order; battle effects render after the card group.
+		down.z_index = 0
 
 func _portrait(at: Vector2, dimensions: Vector2) -> void:
 	var layer := Control.new()
@@ -95,6 +100,8 @@ func _portrait(at: Vector2, dimensions: Vector2) -> void:
 		face.skill_costs[slot] = "已" if battle.runtime.is_spent(card.name, skill, slot) else str(battle.runtime.ap_cost(card.name, skill, slot))
 	face.portrait_only = mode == 0 or selected
 	face.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	face.set_meta("omit_down", true)
+	face.set_meta("omit_unavailable", true)
 	layer.add_child(face)
 	face.scale = Vector2.ONE * (dimensions.x / 208.0)
 	if face.visual.has_node("CardName"): face.visual.get_node("CardName").hide()

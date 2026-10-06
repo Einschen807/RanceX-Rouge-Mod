@@ -38,7 +38,8 @@ func _ready() -> void:
 	visual.pivot_offset = visual.size / 2.0
 	visual.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(visual)
-	pressed.connect(func() -> void: card_clicked.emit(card.name, leader))
+	pressed.connect(func() -> void:
+		if not selection_blocked(): card_clicked.emit(card.name, leader))
 	mouse_entered.connect(func() -> void:
 		_hovered = true
 		refresh_feedback())
@@ -55,6 +56,9 @@ func refresh_feedback() -> void:
 	var tint := Color(1.15, 1.15, 1.10) if _hovered or has_focus() else Color.WHITE
 	tint.a = DRAGGED_LEADER_ALPHA if leader and dragging else 1.0
 	visual.modulate = tint
+
+func selection_blocked() -> bool:
+	return not leader and troop.is_unavailable(card.name)
 
 func redraw() -> void:
 	for child: Node in visual.get_children():
@@ -76,6 +80,7 @@ func redraw() -> void:
 	FormationArt.picture(visual, "frame_%d" % display_card.faction, Vector2.ZERO, size)
 	if portrait_only:
 		_portrait_emblem()
+		_down_art()
 		return
 	if detail_mode == 2:
 		_skill(0, 4, true)
@@ -118,6 +123,24 @@ func redraw() -> void:
 			badge.animation_path = "res://assets/formation/native/card_leader/animation.json"
 			visual.add_child(badge)
 	refresh_feedback()
+	_down_art()
+	if selection_blocked() and not get_meta("omit_unavailable", false):
+		var shade := ColorRect.new()
+		shade.name = "UnavailableShade"
+		shade.size = size
+		shade.color = Color(0, 0, 0, 0.55)
+		shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		visual.add_child(shade)
+		var unavailable := FormationArt.picture(visual, "unselectable", Vector2.ZERO, size)
+		unavailable.name = "UnavailableState"
+
+func _down_art() -> void:
+	if not troop.down_cards.has(card.name) or get_meta("omit_down", false): return
+	if selection_blocked(): return
+	var down := OriginalFlatPlayer.new()
+	down.name = "DownState"
+	down.animation_path = "res://assets/battle/native/down_overlay/animation.json"
+	visual.add_child(down)
 
 func _portrait_emblem() -> void:
 	FormationArt.picture(visual, "medallion_%d" % display_card.faction, Vector2(3, 1), Vector2(60, 60))
@@ -164,7 +187,7 @@ func flip_to(mode: int) -> void:
 	tween.tween_callback(func() -> void: flipping = false)
 
 func _can_drop_data(_at: Vector2, data: Variant) -> bool:
-	return data is Dictionary and data.get("troop") == troop and data.has("card") and (leader or data.get("from_leader", false))
+	return data is Dictionary and data.get("troop") == troop and data.has("card") and (not troop.is_unavailable(data.card) or (data.get("from_leader", false) and data.card in troop.leaders)) and (leader or data.get("from_leader", false))
 
 func _drop_data(_at: Vector2, data: Variant) -> void:
 	if leader:

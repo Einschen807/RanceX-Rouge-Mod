@@ -11,13 +11,15 @@ var cards: Array[Dictionary] = []
 var by_name: Dictionary = {}
 var by_identity: Dictionary = {}
 var skills: Dictionary = {}
+var supports: Dictionary = {}
 var errors: PackedStringArray = []
 
-func load_catalog(card_path: String = "res://data/cards.txt", skill_path: String = "res://data/skills.txt") -> bool:
+func load_catalog(card_path: String = "res://data/cards.txt", skill_path: String = "res://data/skills.txt", support_path: String = "") -> bool:
 	cards.clear()
 	by_name.clear()
 	by_identity.clear()
 	skills.clear()
+	supports.clear()
 	errors.clear()
 	var skill_rows := _read(skill_path)
 	for row: Array in skill_rows:
@@ -33,14 +35,21 @@ func load_catalog(card_path: String = "res://data/cards.txt", skill_path: String
 		for n: int in range(1, 4):
 			if not SkillBaseEffects.has_effect(s["effect%d" % n]):
 				errors.append("技能 %s 引用了未注册的基础效果" % s.name)
-			if s["value%d" % n] < 0:
-				errors.append("技能 %s 的效果数值不能为负" % s.name)
-			if BattleStatusEffects.valid(s["effect%d" % n]) and not BattleStatusEffects.valid_value(s["value%d" % n]):
-				errors.append("技能 %s 的异常回合必须为1～9（对方）或11～19（自身）" % s.name)
+			if not SkillBaseEffects.valid_value(s["effect%d" % n], s["value%d" % n]):
+				errors.append("技能 %s 的效果参数无效" % s.name)
 		if not SkillBaseEffects.has_condition(s.condition):
 			errors.append("技能 %s 引用了未注册的条件" % s.name)
 		s.description = s.description.replace("r", "\n")
 		skills[s.id] = s
+	if support_path.is_empty() and skill_path == "res://data/skills.txt": support_path = "res://data/supports.txt"
+	if not support_path.is_empty():
+		var support_database := SupportCatalog.new()
+		if support_database.load_catalog(skills, support_path): supports = support_database.entries
+		else: errors.append_array(support_database.errors)
+	else:
+		for skill: Dictionary in skills.values():
+			for n: int in range(1, 4):
+				if int(skill["effect%d" % n]) in [30, 31]: errors.append("配置支援的技能需要支援数据文件")
 	for row: Array in _read(card_path):
 		if not _schema(row, CARD_FIELDS.size(), [0, 1, 2]):
 			continue
@@ -69,6 +78,7 @@ func load_catalog(card_path: String = "res://data/cards.txt", skill_path: String
 		by_name.clear()
 		by_identity.clear()
 		skills.clear()
+		supports.clear()
 	return errors.is_empty()
 
 func find_name(display_name: String) -> Dictionary:

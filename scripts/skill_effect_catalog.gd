@@ -35,7 +35,8 @@ static func resolve(skill: Dictionary, element: int = 0) -> Dictionary:
 	var name: String = DEFAULTS.get(kind, "附加效果")
 	if kind in [4, 6]:
 		for slot: int in range(1, 4):
-			if BattleStatusEffects.valid(int(skill.get("effect%d" % slot, 0))) and int(skill.get("value%d" % slot, 0)) in range(1, 10):
+			var status: int = skill.get("effect%d" % slot, 0)
+			if BattleStatusEffects.valid(status) and status != BattleStatusEffects.PURITY and int(skill.get("value%d" % slot, 0)) in range(1, 10):
 				name = "负面效果"
 				break
 	if kind == 3:

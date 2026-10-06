@@ -317,6 +317,9 @@ func _card_at(point: Vector2) -> CardWidget:
 	return null
 
 func _start_drag(point: Vector2) -> void:
+	if not is_instance_valid(_drag_source) or _drag_source.selection_blocked():
+		_drag_source = null
+		return
 	_drag_source.dragging = true
 	_drag_art = _drag_source.visual
 	_drag_name = _drag_source.card.name
@@ -567,6 +570,7 @@ func _input(event: InputEvent) -> void:
 		if event.pressed:
 			if not _transitioning and not _flip_locked:
 				_drag_source = _card_at(event.position)
+				if is_instance_valid(_drag_source) and _drag_source.selection_blocked(): _drag_source = null
 				_drag_start = event.position
 		elif _drag_art != null:
 			get_viewport().set_input_as_handled()

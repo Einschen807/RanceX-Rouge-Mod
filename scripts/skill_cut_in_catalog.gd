@@ -40,6 +40,6 @@ static func _prepare_nodes(node: Node) -> void:
 		node.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		node.focus_mode = Control.FOCUS_NONE
 	if node is AudioStreamPlayer:
-		node.bus = &"SFX"
+		node.bus = &"Voice"
 	for child: Node in node.get_children():
 		_prepare_nodes(child)

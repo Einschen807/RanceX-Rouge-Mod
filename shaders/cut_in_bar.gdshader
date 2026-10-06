@@ -3,6 +3,7 @@ render_mode unshaded;
 
 uniform sampler2D portrait_texture : filter_linear;
 uniform bool portrait_enabled = false;
+uniform bool portrait_black_matte = false;
 uniform vec4 accent : source_color = vec4(0.25, 0.79, 0.61, 1.0);
 uniform vec4 portrait_rect = vec4(-425.0, -100.0, 1470.0, 819.0);
 uniform vec2 frame_extent = vec2(1180.0, 378.0);
@@ -77,6 +78,10 @@ void fragment() {
 		vec2 portrait_position = portrait_rect.xy + portrait_push * vec2(310.0, -145.0);
 		vec2 uv = (pixel - portrait_position) / portrait_rect.zw;
 		vec4 art = texture(portrait_texture, clamp(uv, vec2(0.0), vec2(1.0)));
+		if (portrait_black_matte) {
+			// Supplied black-backed artwork can reveal the moving frame without rewriting the source.
+			art.a *= smoothstep(0.0, 0.008, max(art.r, max(art.g, art.b)));
+		}
 		art.a *= step(0.0, uv.x) * step(0.0, uv.y) * step(uv.x, 1.0) * step(uv.y, 1.0);
 		// Composite an opaque portrait over the translucent background.
 		float combined_alpha = art.a + opacity * (1.0 - art.a);

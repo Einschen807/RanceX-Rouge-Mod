@@ -2,6 +2,7 @@ extends Control
 class_name CutInBar
 ## Shared upper-left cut-in. Character scenes only supply portrait, voice and palette.
 @export var portrait: Texture2D
+@export var portrait_black_matte := false
 @export var voice: AudioStream
 @export var accent := Color("40c99c")
 @export var frame_extent := Vector2(1180, 378)
@@ -28,8 +29,9 @@ func _ready() -> void:
 	drawer.material = _material
 	_material.set_shader_parameter("portrait_texture", portrait)
 	_material.set_shader_parameter("portrait_enabled", portrait != null)
+	_material.set_shader_parameter("portrait_black_matte", portrait_black_matte)
 	voice_player.stream = voice
-	voice_player.bus = &"SFX"
+	voice_player.bus = &"Voice"
 	voice_player.volume_db = voice_volume_db
 	voice_player.finished.connect(_voice_finished)
 	_sync_material()

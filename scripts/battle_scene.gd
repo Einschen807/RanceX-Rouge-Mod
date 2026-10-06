@@ -10,7 +10,6 @@ var selected_card := ""
 var lifted_actor := ""
 var _hovered_card := ""
 var _browse_cards := false
-var _entry_run_uses: Dictionary = {}
 var input_locked := false
 var formation: TroopFormation
 var popup: Control
@@ -56,6 +55,7 @@ var _pending_damage_preview: Dictionary = {}
 var _pointer_position := Vector2.ZERO
 var _pointer_known := false
 var _status_bars: Array[BattleStatusBar] = []
+var _support_bars: Array[BattleSupportBar] = []
 var _hidden_hp_labels: Dictionary = {}
 
 func _process(delta: float) -> void:
@@ -114,7 +114,6 @@ func _ready() -> void:
 	clip_contents = true
 	speed = get_node("/root/Settings").battle_speed()
 	get_node("/root/Settings").opened.connect(_clear_skill_preview)
-	_entry_run_uses = battle.runtime.run_uses.duplicate(true)
 	_build_view()
 
 func _build_view() -> void:
@@ -126,8 +125,17 @@ func _build_view() -> void:
 	_presentation.layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(_presentation)
 	_status_bars.clear()
+	_support_bars.clear()
 	_hidden_hp_labels.clear()
 	for side: String in ["enemy", "player"]:
+		var support_bar := BattleSupportBar.new()
+		support_bar.name = "EnemySupportBar" if side == "enemy" else "PlayerSupportBar"
+		support_bar.view = self
+		support_bar.side = side
+		add_child(support_bar)
+		_support_bars.append(support_bar)
+		battle.support_event.connect(support_bar.on_support_event)
+		support_bar.detail_requested.connect(_show_support_detail)
 		var bar := BattleStatusBar.new()
 		bar.name = "EnemyStatusBar" if side == "enemy" else "PlayerStatusBar"
 		bar.view = self
@@ -153,9 +161,12 @@ func _restart_battle() -> void:
 	_close_popup()
 	battle.changed.disconnect(_refresh)
 	battle.log_added.disconnect(_on_log_added)
-	var restarted := BattleState.new()
-	battle.runtime.run_uses = _entry_run_uses.duplicate(true)
-	restarted.configure(battle.troop, battle.database, battle.monster.identity)
+	var restarted := BattleCheckpoint.restore(battle, battle.preparation_checkpoint)
+	if restarted == null:
+		battle.changed.connect(_refresh)
+		battle.log_added.connect(_on_log_added)
+		battle.log_message("战前快照无法恢复，重开未执行")
+		return
 	battle = restarted
 	if _breath != null: _breath.kill()
 	_breath = null
@@ -163,6 +174,9 @@ func _restart_battle() -> void:
 	analysis_panel = null
 	_result = null
 	_combo_shown = 0
+	_playing_enemy_intents = false
+	_ap_override = -1
+	_ap_hover_key = ""
 	selected_card = ""
 	_hovered_card = ""
 	_browse_cards = false
@@ -386,6 +400,7 @@ func _refresh() -> void:
 	_set_hp_with_trail(_enemy_fill, _enemy_hp_trail, battle.enemy_hp, battle.enemy_max_hp)
 	_set_hp_with_trail(_player_fill, _player_hp_trail, battle.player_hp, battle.player_max_hp)
 	for bar: BattleStatusBar in _status_bars: bar.sync()
+	for bar: BattleSupportBar in _support_bars: bar.sync()
 	_refresh_hp_visibility()
 	_round.text = str(battle.round)
 	_swap.disabled = input_locked or not battle.can_swap()
@@ -461,6 +476,9 @@ func _refresh_cards() -> void:
 	BattleArt.clear(_cards)
 	for i: int in range(battle.troop.leaders.size()):
 		var name: String = battle.troop.leaders[i]
+		# Keep the old DOWN view through the round title, until its entrance starts.
+		for replacement: Dictionary in battle.pending_down_replacements:
+			if int(replacement.slot) == i: name = replacement.previous
 		if name.is_empty():
 			BattleArt.picture(_cards, "card_frame", Vector2(198 + 218 * i, 728))
 			continue
@@ -659,6 +677,7 @@ func _end_turn() -> void:
 	_playing_enemy_intents = true
 	_presentation.native("enemy_turn", Vector2.ZERO, BattlePresentation.ENEMY_TEMPO)
 	await _wait_animation(0.8 / BattlePresentation.ENEMY_TEMPO)
+	await _presentation.support_actions("enemy")
 	var ids: Array = battle.intent.get("skills", []).duplicate()
 	for id: int in ids:
 		if battle.phase != "enemy": break
@@ -799,6 +818,22 @@ func _show_status_detail(side: String, id: int) -> void:
 	# Anchor the original compact description just above the selected status icon.
 	var at := Vector2(clampf(icon.position.x - 120, 12, 1508), icon.position.y - 174)
 	_show_description("StatusDescription", BattleStatusEffects.effect_name(id), BattleStatusEffects.description(id), at)
+
+func _show_support_detail(side: String, uid: int) -> void:
+	if battle.information_hidden(side) or is_instance_valid(formation): return
+	for i: int in range(BattleSupports.group(battle, side).size()):
+		var entry: Dictionary = BattleSupports.group(battle, side)[i]
+		if int(entry.uid) != uid: continue
+		var support := BattleSupports.definition(battle, entry)
+		var text: String = support.description
+		if text.is_empty(): text = troop_skill_description(support.skill)
+		var bar := _support_bars[1 if side == "player" else 0]
+		var y := clampf(bar.support_position(i).y, 15, 860)
+		_show_description("SupportDescription", support.name, text, Vector2(1275 if side == "player" else 235, y))
+		return
+
+func troop_skill_description(id: int) -> String:
+	return String(battle.troop.catalog.skills.get(id, {}).get("description", ""))
 
 func _analysis_text(parent: Control, title: String, text: String, at: Vector2, dimensions: Vector2, font_size: int, color: Color = Color.WHITE, outline: int = 1) -> Label:
 	var label := BattleArt.label(parent, text, at, dimensions, font_size, color)
