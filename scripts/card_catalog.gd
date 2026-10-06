@@ -3,7 +3,7 @@ class_name CardCatalog
 ## One file for every card and one for every skill; never instantiate one scene per character.
 
 const CARD_FIELDS := ["name", "identity", "portrait", "faction", "element", "gender", "skill1", "skill2", "base_hp", "base_at", "rarity"]
-const SKILL_FIELDS := ["id", "name", "action", "type", "effect_asset", "ap", "effect1", "value1", "effect2", "value2", "effect3", "value3", "custom", "condition", "ultimate", "ap_type", "description"]
+const SKILL_FIELDS := ["id", "name", "action", "type", "effect_asset", "cut_in", "ap", "effect1", "value1", "effect2", "value2", "effect3", "value3", "custom", "condition", "ultimate", "ap_type", "description"]
 const FACTIONS := ["主人公", "利萨斯", "赫尔曼", "赛斯", "自由都市", "JAPAN", "其他", "亚人", "怪物", "神魔"]
 const ELEMENTS := ["无", "炎", "冰", "雷", "光", "暗"]
 const UPGRADE_SUFFIX := "+"
@@ -21,7 +21,7 @@ func load_catalog(card_path: String = "res://data/cards.txt", skill_path: String
 	errors.clear()
 	var skill_rows := _read(skill_path)
 	for row: Array in skill_rows:
-		if not _schema(row, SKILL_FIELDS.size(), [1, 4, 13, 16]):
+		if not _schema(row, SKILL_FIELDS.size(), [1, 4, 5, 14, 17]):
 			continue
 		var s := _dictionary(SKILL_FIELDS, row)
 		var action: int = s.action
@@ -35,6 +35,8 @@ func load_catalog(card_path: String = "res://data/cards.txt", skill_path: String
 				errors.append("技能 %s 引用了未注册的基础效果" % s.name)
 			if s["value%d" % n] < 0:
 				errors.append("技能 %s 的效果数值不能为负" % s.name)
+			if BattleStatusEffects.valid(s["effect%d" % n]) and not BattleStatusEffects.valid_value(s["value%d" % n]):
+				errors.append("技能 %s 的异常回合必须为1～9（对方）或11～19（自身）" % s.name)
 		if not SkillBaseEffects.has_condition(s.condition):
 			errors.append("技能 %s 引用了未注册的条件" % s.name)
 		s.description = s.description.replace("r", "\n")

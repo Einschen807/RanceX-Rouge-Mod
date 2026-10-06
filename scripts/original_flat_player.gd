@@ -9,6 +9,8 @@ signal frame_advanced(tick: int)
 var playback_speed := 1.0
 var project_tilt := false
 var hidden_libraries: PackedStringArray = []
+## Native status application replaces the placeholder icon without changing its timeline.
+var texture_overrides: Dictionary = {}
 
 const MIX_SHADER: Shader = preload("res://shaders/flat_mix.gdshader")
 const ADD_SHADER: Shader = preload("res://shaders/flat_add.gdshader")
@@ -58,6 +60,8 @@ func load_animation(path: String) -> void:
 		_libraries[String(lib["name"])] = lib
 	for key: String in _data["textures"]:
 		_textures[key] = load(String(_data["textures"][key])) as Texture2D
+	for key: String in texture_overrides:
+		_textures[key] = texture_overrides[key]
 	fps = float(_data["fps"])
 	elapsed = 0.0
 	_clock = 0.0

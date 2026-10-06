@@ -36,6 +36,12 @@ func _ready() -> void:
 	button_up.connect(func() -> void: _down = false; refresh_art())
 	refresh_art()
 
+func sync_hover(hovered: bool) -> void:
+	# Rebuilt buttons can appear under a stationary pointer without an enter signal.
+	if hovered != _hover:
+		_hover = hovered
+		refresh_art()
+
 func refresh_art() -> void:
 	if art == null:
 		return

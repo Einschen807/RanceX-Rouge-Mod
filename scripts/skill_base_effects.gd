@@ -4,7 +4,7 @@ class_name SkillBaseEffects
 ## Resolution returns commands to a future battle consumer, and never reads description text.
 
 static func has_effect(id: int) -> bool:
-	return id in [0, 1, 2, 3, 4]
+	return id in [0, 1, 2, 3, 4] or BattleStatusEffects.valid(id)
 
 static func has_condition(condition: String) -> bool:
 	return BattleConditions.valid(condition)
@@ -24,9 +24,12 @@ static func resolve(skill: Dictionary, context: Dictionary) -> Array[Dictionary]
 		if effect == 1:
 			# Combo repeats only attack commands. Other numbered effects execute once.
 			for hit: int in range(hits):
-				commands.append({"kind": "damage", "amount": float(context.get("deployed_at", 0.0)) * value / 100.0, "multiplier": value / 100.0, "hit": hit + 1})
+				commands.append({"kind": "damage", "amount": float(context.get("deployed_at", 0.0)) * value / 100.0, "multiplier": value / 100.0, "hit": hit + 1, "element": int(context.get("element", 0))})
 		elif effect == 3:
 			commands.append({"kind": "heal", "amount": float(context.get("deployed_at", 0.0)) * value / 100.0})
 		elif effect == 4:
 			commands.append({"kind": "buff", "stat": "at", "amount": value})
+		elif BattleStatusEffects.valid(effect):
+			var command := BattleStatusEffects.command(effect, value)
+			if not command.is_empty(): commands.append(command)
 	return commands

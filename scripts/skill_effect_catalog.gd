@@ -33,6 +33,11 @@ static func resolve(skill: Dictionary, element: int = 0) -> Dictionary:
 			push_warning("技能特效不存在，使用类型默认特效：" + specified)
 	var kind := int(skill.get("type", 1))
 	var name: String = DEFAULTS.get(kind, "附加效果")
+	if kind in [4, 6]:
+		for slot: int in range(1, 4):
+			if BattleStatusEffects.valid(int(skill.get("effect%d" % slot, 0))) and int(skill.get("value%d" % slot, 0)) in range(1, 10):
+				name = "负面效果"
+				break
 	if kind == 3:
 		var index := element - 1 if element in [1, 2, 3, 4, 5] else randi_range(0, 4)
 		name = "魔法／%s魔法攻击" % MAGIC[index]

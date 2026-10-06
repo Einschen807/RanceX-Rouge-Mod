@@ -1,0 +1,11 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/cut_in_bar_template.tscn" id="1_template"]
+[ext_resource type="Texture2D" path="res://assets/cut_ins/portraits/rance.png" id="2_portrait"]
+[ext_resource type="AudioStream" path="res://assets/cut_ins/voices/rance.mp3" id="3_voice"]
+
+[node name="RanceCutIn" instance=ExtResource("1_template")]
+portrait = ExtResource("2_portrait")
+voice = ExtResource("3_voice")
+accent = Color(0.16, 0.76, 0.55, 1)
+portrait_position = Vector2(-425, -100)

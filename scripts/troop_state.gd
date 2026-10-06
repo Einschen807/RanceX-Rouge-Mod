@@ -8,6 +8,9 @@ var leaders: Array[String] = ["", "", "", "", "", "", ""]
 var levels: Dictionary = {}
 var ox_coefficient := 5.0
 var bonuses: Dictionary = {}
+## Persistent formation rates. Combat support/status modifiers belong to BattleState.
+var damage_rates := {"physical": 0.0, "magic": 0.0}
+var resistance_rates := {"physical": 0.0, "magic": 0.0}
 var bonus_points := 0
 var encyclopedia_mode := false
 var skill_runtime := SkillRuntime.new()
@@ -111,8 +114,10 @@ func rate(kind: String) -> float:
 	var all := 3.0 * (int(bonuses.get(12, false)) + int(bonuses.get(13, false)))
 	match kind:
 		"hp": return all + (30.0 if bonuses.get(8, false) else 0.0)
-		"physical": return all + (30.0 if bonuses.get(9, false) else 0.0)
-		"magic": return all + (30.0 if bonuses.get(10, false) else 0.0)
+		"physical": return float(damage_rates.physical) + all + (30.0 if bonuses.get(9, false) else 0.0)
+		"magic": return float(damage_rates.magic) + all + (30.0 if bonuses.get(10, false) else 0.0)
+		"physical_resist": return float(resistance_rates.physical)
+		"magic_resist": return float(resistance_rates.magic)
 	return 0.0
 
 func toggle_bonus(index: int) -> bool:

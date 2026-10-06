@@ -70,4 +70,4 @@ func use_skill(actor: String, skill: Dictionary, context: Dictionary, slot: int 
 	var commands := SkillBaseEffects.resolve(skill, context)
 	if skill.custom == 1:
 		commands.append_array(SkillCustomEffects.resolve(skill.id, context))
-	return {"ok": true, "commands": commands, "ap_spent": spent, "effect_asset": skill.effect_asset}
+	return {"ok": true, "commands": commands, "ap_spent": spent, "effect_asset": skill.effect_asset, "cut_in": skill.get("cut_in", "")}

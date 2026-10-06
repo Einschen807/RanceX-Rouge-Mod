@@ -207,7 +207,7 @@ func _refresh() -> void:
 	_summary.hp.text = CardWidget._number(troop.total("hp", preview_upgrades))
 	_summary.at.text = CardWidget._number(troop.total("at", preview_upgrades))
 	for kind: String in ["physical_resist", "magic_resist", "critical", "combo"]:
-		_summary[kind].text = "0%"
+		_summary[kind].text = "%d%%" % int(troop.rate(kind))
 	_summary.hp_rate.text = "%d%%" % int(troop.rate("hp"))
 	_summary.physical.text = "%d%%" % int(troop.rate("physical"))
 	_summary.magic.text = "%d%%" % int(troop.rate("magic"))

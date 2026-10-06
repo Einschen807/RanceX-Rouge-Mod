@@ -46,7 +46,8 @@ func _ready() -> void:
 		at_background.color = Color(0, 0, 0, 0.62)
 		at_background.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(at_background)
-	var at := BattleArt.label(self, str(int(floor(battle.troop.deployed(card, "at") * (1.0 + battle.player_at_bonus / 100.0)))), Vector2(3, 206 if mode == 0 else 270), Vector2(202, 34), 28, Color(1, 0.98, 0.82), HORIZONTAL_ALIGNMENT_CENTER)
+	# Deployment AT is a formation value. Combat modifiers only affect damage.
+	var at := BattleArt.label(self, str(int(floor(battle.troop.deployed(card, "at")))), Vector2(3, 206 if mode == 0 else 270), Vector2(202, 34), 28, Color(1, 0.98, 0.82), HORIZONTAL_ALIGNMENT_CENTER)
 	at.name = "BattleAT"
 	var acted: bool = battle.runtime.acted.get(card.name, false)
 	if acted:
@@ -69,6 +70,13 @@ func _ready() -> void:
 		_hover_border = BattleArt.flat(self, "card_hover")
 		_hover_border.name = "HoverBorder"
 		_hover_border.hide()
+	if card.name in battle.blocked_player_actors:
+		var blocked := BattleArt.picture(self, "status/blocked_large", Vector2(76, 100) if mode == 0 else Vector2(48, 128), Vector2(56, 56) if mode == 0 else Vector2(112, 112))
+		blocked.name = "BlockedAction"
+		blocked.z_index = 20
+		var stun := BattleArt.flat(self, "status_blocked_card")
+		stun.name = "ConfusionStun"
+		stun.z_index = 21
 
 func _portrait(at: Vector2, dimensions: Vector2) -> void:
 	var layer := Control.new()

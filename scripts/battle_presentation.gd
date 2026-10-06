@@ -2,18 +2,24 @@ extends Node
 class_name BattlePresentation
 const CARD_MOVE_TIME := 0.16
 const ENEMY_TEMPO := 1.15
+## All multi-hit actions share the reference cadence: 0.30s at speed 3,
+## 0.45s at speed 2 and 0.90s at speed 1 (battle clock runs at speed * 4/3).
+const MULTI_HIT_INTERVAL := 1.2
+const MULTI_HIT_RECOVERY := 0.15
+const MULTI_HIT_NUMBER_TIME := 0.8
 ## Action presentation owns timing; BattleState still owns all combat arithmetic.
 var view: BattleScene
 var layer: Control
 var _transients: Array[OriginalFlatPlayer] = []
 var _tweens: Array[Tween] = []
 var _voices: Array[AudioStreamPlayer] = []
+var _cut_in_players: Array[AnimationPlayer] = []
 
 func _process(_delta: float) -> void:
 	for effect: OriginalFlatPlayer in _transients.duplicate():
 		if not is_instance_valid(effect):
 			_transients.erase(effect)
-		elif effect.is_root_finished():
+		elif effect.is_root_finished() or effect.elapsed >= float(effect.get_meta("lifetime", INF)):
 			_transients.erase(effect)
 			effect.queue_free()
 	for tween: Tween in _tweens.duplicate():
@@ -21,6 +27,11 @@ func _process(_delta: float) -> void:
 			_tweens.erase(tween)
 		else:
 			tween.set_speed_scale(view.animation_speed() * float(tween.get_meta("animation_rate", 1.0)))
+	for player: AnimationPlayer in _cut_in_players.duplicate():
+		if not is_instance_valid(player):
+			_cut_in_players.erase(player)
+		else:
+			player.speed_scale = 1.0
 
 func native(asset: String, at: Vector2 = Vector2.ZERO, rate: float = 1.0) -> OriginalFlatPlayer:
 	return _native_path("res://assets/battle/native/%s/animation.json" % asset, at, rate)
@@ -44,6 +55,26 @@ func _tween(rate: float = 1.0) -> Tween:
 
 static func effect_for(skill: Dictionary, element: int = 0) -> Dictionary:
 	return SkillEffectCatalog.resolve(skill, element)
+
+func _play_cut_in(skill: Dictionary) -> void:
+	var cut_in := SkillCutInCatalog.instantiate(str(skill.get("cut_in", "")))
+	if cut_in == null: return
+	var player := cut_in.get_node("AnimationPlayer") as AnimationPlayer
+	# Cut-ins have a fixed presentation tempo, independent of all combat speed rates.
+	player.speed_scale = 1.0
+	cut_in.z_index = 100
+	layer.add_child(cut_in)
+	cut_in.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_cut_in_players.append(player)
+	player.play(SkillCutInCatalog.ANIMATION)
+	await player.animation_finished
+	_cut_in_players.erase(player)
+	if is_instance_valid(cut_in):
+		cut_in.hide()
+		# Preserve a short audio tail if the visual wipe finishes between mix frames.
+		if cut_in is CutInBar and cut_in.voice_player.playing:
+			await cut_in.voice_player.finished
+		cut_in.queue_free()
 
 func _sound(path: String) -> void:
 	if path.is_empty() or not ResourceLoader.exists(path): return
@@ -126,6 +157,30 @@ func automatic_actions() -> void:
 		if prepared.get("ok", false): await action(entry.actor, entry.id, false, entry.slot, prepared)
 	view.battle.pending_automatic_skills.clear()
 
+static func command_steps(commands: Array) -> Array[Array]:
+	# One attack per step. Other commands keep their original order and run once.
+	var steps: Array[Array] = []
+	var step: Array[Dictionary] = []
+	var has_attack := false
+	for command: Dictionary in commands:
+		if command.kind == "damage" and has_attack:
+			steps.append(step)
+			step = []
+			has_attack = false
+		step.append(command)
+		if command.kind == "damage": has_attack = true
+	steps.append(step)
+	return steps
+
+func _skill_effect(descriptor: Dictionary, at: Vector2, rate: float) -> Dictionary:
+	var timing := {"impact": 0.25, "duration": 0.0}
+	if not descriptor.is_empty():
+		var effect := _native_path(descriptor.path, at, rate)
+		_sound(descriptor.get("sound_path", ""))
+		timing.impact = _impact_time(effect)
+		timing.duration = float(effect._data.get("play_duration", float(effect._root.end_frame + 1) / effect.fps))
+	return timing
+
 func action(actor: String, id: int, enemy := false, slot: int = -1, automatic: Dictionary = {}) -> void:
 	# The queue animation has already played. A blocked action only records its skip.
 	if enemy and not view.battle.can_use_enemy_skill(id):
@@ -139,65 +194,127 @@ func action(actor: String, id: int, enemy := false, slot: int = -1, automatic: D
 		card = _card_lift(actor)
 	var banner := _banner(actor, skill, enemy)
 	await view._wait_animation((0.14 if enemy else CARD_MOVE_TIME) / rate)
+	var forecast := BattleForecast.action(view.battle, actor, id, enemy, slot, automatic)
+	if get_node("/root/Settings").should_play_cut_in(not enemy and forecast.lethal):
+		await _play_cut_in(skill)
 	var attack := int(skill.type) in [1, 2, 3]
+	for n: int in range(1, 4):
+		if BattleStatusEffects.valid(int(skill.get("effect%d" % n, 0))) and int(skill.get("value%d" % n, 0)) in range(1, 10): attack = true
 	# Support effects belong to the acting side; offensive effects to its opponent.
 	var at := Vector2(960, 860 if enemy == attack else 350)
 	var element := 0 if enemy else int(view.battle.troop.catalog.find_name(actor).get("element", 0))
 	var descriptor := effect_for(skill, element)
-	var impact := 0.25
-	var duration := 0.0
-	if not descriptor.is_empty():
-		var effect := _native_path(descriptor.path, at, rate)
-		_sound(descriptor.get("sound_path", ""))
-		impact = _impact_time(effect)
-		duration = float(effect._data.get("play_duration", float(effect._root.end_frame + 1) / effect.fps))
-	await view._wait_animation(impact / rate)
-	var before_enemy := view.battle.enemy_hp
-	var before_player := view.battle.player_hp
+	var effect_rate := rate
+	var timing := _skill_effect(descriptor, at, effect_rate)
+	await view._wait_animation(float(timing.impact) / effect_rate)
 	var result: Dictionary
 	if not automatic.is_empty():
-		result = view.battle.apply_automatic_skill(actor, id, automatic)
+		result = automatic
+		if result.get("ok", false): view.battle.log_message("%s 自动发动 %s" % [actor, skill.name])
 	else:
-		result = view.battle.use_enemy_skill(id) if enemy else view.battle.use_player_skill(actor, id, slot)
+		result = view.battle.prepare_enemy_skill(id) if enemy else view.battle.prepare_player_skill(actor, id, slot)
+	var multi_hit := false
 	if result.ok:
-		var dealt := (before_player - view.battle.player_hp) if enemy else (before_enemy - view.battle.enemy_hp)
-		if dealt > 0:
-			_damage(dealt, Vector2(960, 860 if enemy else 350), rate)
-			_sound("res://assets/audio/attack_damage.ogg")
-		elif view.battle.player_hp > before_player:
-			_heal(view.battle.player_hp - before_player)
+		var steps := command_steps(result.commands)
+		multi_hit = steps.size() > 1
+		for index: int in range(steps.size()):
+			if index > 0:
+				# Schedule impact-to-impact, regardless of attack type or hit count.
+				# Long repeat wind-ups must fit while keeping a short recovery window.
+				effect_rate = maxf(rate, float(timing.impact) / (MULTI_HIT_INTERVAL - MULTI_HIT_RECOVERY))
+				var wind_up := float(timing.impact) / effect_rate
+				await view._wait_animation(MULTI_HIT_INTERVAL - wind_up)
+				timing = _skill_effect(descriptor, at, effect_rate)
+				await view._wait_animation(float(timing.impact) / effect_rate)
+			var before_enemy := view.battle.enemy_hp
+			var before_player := view.battle.player_hp
+			view.battle.apply_skill_commands("enemy" if enemy else "player", id, steps[index], index == steps.size() - 1)
+			for target_side: String in ["enemy", "player"]:
+				var dealt := (before_player - view.battle.player_hp) if target_side == "player" else (before_enemy - view.battle.enemy_hp)
+				if dealt > 0:
+					_damage(dealt, Vector2(960, 860 if target_side == "player" else 350), rate, multi_hit)
+					_sound("res://assets/audio/attack_damage.ogg")
+				elif dealt < 0.0 and not view.battle.information_hidden(target_side):
+					_heal(-dealt, target_side == "enemy")
+			for command: Dictionary in steps[index]:
+				if command.get("miss", false):
+					_miss(Vector2(960, 860 if enemy else 350), rate)
+			if index == 0:
+				# The actor returns after the first impact; remaining strikes are one action.
+				_return_card(card)
+				card = null
+				banner.hide()
+				banner.queue_free()
+	else:
+		view.battle.changed.emit()
 	if not enemy and automatic.is_empty(): view.finish_ap_payment()
-	if is_instance_valid(card):
-		var down := _tween().set_parallel(true)
-		down.tween_property(card, "position:y", 730.0, CARD_MOVE_TIME).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-		down.tween_property(card, "scale", Vector2.ONE, CARD_MOVE_TIME).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-		down.chain().tween_callback(_finish_card_lift.bind(card))
+	_return_card(card)
 	await view._wait_animation(0.12 / rate)
-	banner.queue_free()
+	if is_instance_valid(banner): banner.queue_free()
 	# Let long effects finish before the next actor starts, preserving their native tail.
-	await view._wait_animation(maxf(0.55, duration - impact - 0.12) / rate)
+	var effect_tail := (float(timing.duration) - float(timing.impact)) / effect_rate - 0.12 / rate
+	var damage_tail := ((MULTI_HIT_NUMBER_TIME if multi_hit else 0.66) - 0.12) / rate
+	await view._wait_animation(maxf(0.55 / rate, maxf(effect_tail, damage_tail)))
+	# Give native/tween processing the final frame before the next action starts.
+	if multi_hit: await get_tree().process_frame
 
-func _damage(amount: float, at: Vector2, rate: float = 1.0) -> void:
-	native("damage_flash", at, rate)
+func _return_card(card: CardWidget) -> void:
+	if not is_instance_valid(card): return
+	var down := _tween().set_parallel(true)
+	down.tween_property(card, "position:y", 730.0, CARD_MOVE_TIME).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	down.tween_property(card, "scale", Vector2.ONE, CARD_MOVE_TIME).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	down.chain().tween_callback(_finish_card_lift.bind(card))
+
+func _damage(amount: float, at: Vector2, rate: float = 1.0, combo := false) -> void:
+	if view.battle.information_hidden("player" if at.y > 600 else "enemy"): return
+	var number_time := MULTI_HIT_NUMBER_TIME if combo else 0.66
+	var flash_time := MULTI_HIT_NUMBER_TIME if combo else 0.4
 	var number_at := at - Vector2(0, 60) if at.y < 600 else at
+	var flash := native("damage_flash", number_at, rate)
+	flash.set_meta("lifetime", flash_time)
+	# This stopped native root contains the red/gold flare behind the damage value.
+	# Its nested timeline is held by the original engine, so bound its display explicitly.
+	var ground := native("damage_ground", number_at, rate)
+	ground.set_meta("lifetime", flash_time)
 	var number := BattleArt.number(layer, "damage_value", number_at - Vector2(330, 53), Vector2(660, 106), HORIZONTAL_ALIGNMENT_CENTER)
 	number.kerning = -8
 	number.name = "ActionDamage"
+	# Projected native layers draw as top-level CanvasItems; keep values above their glow.
+	number.z_index = 10
 	number.text = str(int(floor(amount)))
 	number.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	number.pivot_offset = number.size / 2
 	number.scale = Vector2(1.35, 1.35)
 	var tween := _tween(rate)
 	tween.tween_property(number, "scale", Vector2.ONE, 0.12).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tween.tween_interval(0.36)
-	tween.tween_property(number, "modulate:a", 0.0, 0.18)
+	var fade_time := 0.08 if number_time < 0.66 else 0.18
+	tween.tween_interval(maxf(0.0, number_time - 0.12 - fade_time))
+	tween.tween_property(number, "modulate:a", 0.0, fade_time)
 	tween.tween_callback(number.queue_free)
 
-func _heal(amount: float) -> void:
-	var number := BattleArt.label(layer, "+%d" % int(amount), Vector2(1250, 495), Vector2(450, 70), 48, Color(0.6, 1, 0.62), HORIZONTAL_ALIGNMENT_CENTER)
+func _heal(amount: float, enemy := false) -> void:
+	var at := Vector2(300, 495) if enemy else Vector2(1250, 495)
+	var number := BattleArt.label(layer, "+%d" % int(amount), at, Vector2(450, 70), 48, Color(0.6, 1, 0.62), HORIZONTAL_ALIGNMENT_CENTER)
 	var tween := _tween()
 	tween.tween_property(number, "position:y", 465.0, 0.55)
 	tween.tween_callback(number.queue_free)
+
+func _miss(at: Vector2, rate: float) -> void:
+	# The original MISS timeline stops on its visible frame before its end.
+	# Its owner must fade and retire it, even when the native root never finishes.
+	var effect := native("status_miss", at, rate)
+	effect.set_meta("lifetime", 1.1)
+	var tween := _tween(rate)
+	tween.tween_interval(0.85)
+	tween.tween_property(effect, "modulate:a", 0.0, 0.25)
+
+func status_feedback() -> void:
+	while not view.battle.pending_status_feedback.is_empty():
+		var event: Dictionary = view.battle.pending_status_feedback.pop_front()
+		if float(event.damage) > 0.0:
+			_damage(event.damage, Vector2(960, 860 if event.side == "player" else 350))
+			_sound("res://assets/audio/attack_damage.ogg")
+		await view._wait_animation(0.8)
 
 func consume_enemy_intent() -> void:
 	if view._intent_buttons.is_empty(): return
@@ -213,6 +330,9 @@ func consume_enemy_intent() -> void:
 	icon.position = layer.get_global_transform().affine_inverse() * source.global_position
 	icon.set_meta("skill_id", current.get_meta("skill_id"))
 	layer.add_child(icon)
+	if current.has_node("BlockedAction"):
+		var blocked := BattleArt.picture(icon, "status/blocked_small", Vector2.ZERO)
+		blocked.name = "BlockedAction"
 	# Lift out of the clipped queue before scaling, leaving no duplicate behind.
 	current.hide()
 	var pop := _tween(ENEMY_TEMPO)
