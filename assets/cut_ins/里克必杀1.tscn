@@ -1,11 +1,15 @@
 [gd_scene load_steps=4 format=3]
 
-[ext_resource type="PackedScene" path="res://scenes/cut_in_bar_template.tscn" id="1_template"]
-[ext_resource type="Texture2D" path="res://assets/cut_ins/portraits/rick.png" id="2_portrait"]
-[ext_resource type="AudioStream" path="res://assets/cut_ins/voices/rick.mp3" id="3_voice"]
+[ext_resource type="PackedScene" path="res://scenes/cut_in_card_burst_template.tscn" id="1_template"]
+[ext_resource type="Texture2D" path="res://assets/cut_ins/里克立绘.png" id="2_portrait"]
+[ext_resource type="AudioStream" path="res://assets/cut_ins/里克语音.mp3" id="3_voice"]
 
-[node name="RickCutIn" instance=ExtResource("1_template")]
+[node name="RickCardBurst" instance=ExtResource("1_template")]
 portrait = ExtResource("2_portrait")
 voice = ExtResource("3_voice")
-accent = Color(0.91, 0.18, 0.13, 1)
-portrait_position = Vector2(-465, -95)
+actor_name = "Lv58 里克"
+accent = Color(0.96, 0.33, 0.24, 1)
+portrait_black_matte = false
+portrait_position = Vector2(190, 26)
+portrait_width = 1360.0
+portrait_focus_x = 0.51

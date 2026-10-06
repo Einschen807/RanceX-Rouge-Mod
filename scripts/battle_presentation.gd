@@ -56,9 +56,11 @@ func _tween(rate: float = 1.0) -> Tween:
 static func effect_for(skill: Dictionary, element: int = 0) -> Dictionary:
 	return SkillEffectCatalog.resolve(skill, element)
 
-func _play_cut_in(skill: Dictionary) -> void:
+func _play_cut_in(skill: Dictionary, acting_card: CardWidget = null) -> void:
 	var cut_in := SkillCutInCatalog.instantiate(str(skill.get("cut_in", "")))
 	if cut_in == null: return
+	if cut_in is CutInCardBurst:
+		cut_in.configure_source(acting_card)
 	var player := cut_in.get_node("AnimationPlayer") as AnimationPlayer
 	# Cut-ins have a fixed presentation tempo, independent of all combat speed rates.
 	player.speed_scale = 1.0
@@ -72,7 +74,7 @@ func _play_cut_in(skill: Dictionary) -> void:
 	if is_instance_valid(cut_in):
 		cut_in.hide()
 		# Preserve a short audio tail if the visual wipe finishes between mix frames.
-		if cut_in is CutInBar and cut_in.voice_player.playing:
+		if cut_in is CutInCardBurst and cut_in.voice_player.playing:
 			await cut_in.voice_player.finished
 		cut_in.queue_free()
 
@@ -233,7 +235,7 @@ func action(actor: String, id: int, enemy := false, slot: int = -1, automatic: D
 	await view._wait_animation(0.2 if support_action else (0.14 if enemy else CARD_MOVE_TIME) / rate)
 	var forecast := BattleForecast.action(view.battle, actor, id, enemy, slot, automatic)
 	if get_node("/root/Settings").should_play_cut_in(not enemy and forecast.lethal):
-		await _play_cut_in(skill)
+		await _play_cut_in(skill, card)
 	var attack := int(skill.type) in [1, 2, 3]
 	for n: int in range(1, 4):
 		if BattleStatusEffects.valid(int(skill.get("effect%d" % n, 0))) and int(skill.get("value%d" % n, 0)) in range(1, 10): attack = true

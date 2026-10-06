@@ -1,11 +1,15 @@
 [gd_scene load_steps=4 format=3]
 
-[ext_resource type="PackedScene" path="res://scenes/cut_in_bar_template.tscn" id="1_template"]
-[ext_resource type="Texture2D" path="res://assets/cut_ins/portraits/rance.png" id="2_portrait"]
-[ext_resource type="AudioStream" path="res://assets/cut_ins/voices/rance.mp3" id="3_voice"]
+[ext_resource type="PackedScene" path="res://scenes/cut_in_card_burst_template.tscn" id="1_template"]
+[ext_resource type="Texture2D" path="res://assets/cut_ins/兰斯立绘.png" id="2_portrait"]
+[ext_resource type="AudioStream" path="res://assets/cut_ins/兰斯语音.mp3" id="3_voice"]
 
-[node name="RanceCutIn" instance=ExtResource("1_template")]
+[node name="RanceCardBurst" instance=ExtResource("1_template")]
 portrait = ExtResource("2_portrait")
 voice = ExtResource("3_voice")
-accent = Color(0.16, 0.76, 0.55, 1)
-portrait_position = Vector2(-425, -100)
+actor_name = "Lv42 兰斯"
+accent = Color(0.28, 0.86, 0.62, 1)
+portrait_black_matte = false
+portrait_position = Vector2(210, 32)
+portrait_width = 1400.0
+portrait_focus_x = 0.5

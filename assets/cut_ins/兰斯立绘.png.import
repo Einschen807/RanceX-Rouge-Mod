@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://bxief0x0r6kox"
-path="res://.godot/imported/rance.png-a132acea0e13d6cf50868437b494fbc2.ctex"
+path="res://.godot/imported/兰斯立绘.png-5a61ecf8daec05384e8424624258facc.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/cut_ins/portraits/rance.png"
-dest_files=["res://.godot/imported/rance.png-a132acea0e13d6cf50868437b494fbc2.ctex"]
+source_file="res://assets/cut_ins/兰斯立绘.png"
+dest_files=["res://.godot/imported/兰斯立绘.png-5a61ecf8daec05384e8424624258facc.ctex"]
 
 [params]
 

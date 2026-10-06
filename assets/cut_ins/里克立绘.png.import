@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://8g8vo10qa5ph"
-path="res://.godot/imported/rick.png-5c3f9bfe47f5bf0cb42eef598e760ee9.ctex"
+path="res://.godot/imported/里克立绘.png-0abb8a67c1eb63da66621691f72bfd07.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/cut_ins/portraits/rick.png"
-dest_files=["res://.godot/imported/rick.png-5c3f9bfe47f5bf0cb42eef598e760ee9.ctex"]
+source_file="res://assets/cut_ins/里克立绘.png"
+dest_files=["res://.godot/imported/里克立绘.png-0abb8a67c1eb63da66621691f72bfd07.ctex"]
 
 [params]
 
