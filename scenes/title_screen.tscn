@@ -42,8 +42,8 @@ anchor_left = 0.5
 anchor_top = 0.665
 anchor_right = 0.5
 anchor_bottom = 0.665
-offset_left = -310.0
-offset_right = 310.0
+offset_left = -205.0
+offset_right = 205.0
 offset_bottom = 200.0
 grow_horizontal = 2
 theme_override_constants/separation = 10
@@ -59,6 +59,7 @@ script = ExtResource("3_button")
 label_text = "从头开始"
 
 [node name="Continue" type="Button" parent="Actions"]
+visible = false
 custom_minimum_size = Vector2(200, 200)
 layout_mode = 2
 focus_neighbor_left = NodePath("../NewGame")

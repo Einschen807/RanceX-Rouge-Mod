@@ -4,14 +4,14 @@ class_name SkillBaseEffects
 ## Resolution returns commands to a future battle consumer, and never reads description text.
 
 static func has_effect(id: int) -> bool:
-	return id in range(0, 10) or id in range(30, 37) or id in range(40, 44) or BattleStatusEffects.valid(id)
+	return id in range(0, 10) or id in range(30, 37) or id in range(40, 45) or BattleStatusEffects.valid(id)
 
 static func valid_value(id: int, value: int) -> bool:
 	if id in [3, 4]: return true
 	if id in range(6, 10): return true
 	if id == 5: return value in range(1, 8) or value in range(11, 18) or value in [21, 22]
 	if id == 33: return value in [1, 2, 3, 4, 5, 9]
-	if id in [41, 43]: return value == 1
+	if id in [41, 43, 44]: return value == 1
 	if BattleStatusEffects.valid(id): return BattleStatusEffects.valid_value(value)
 	return value >= 0
 

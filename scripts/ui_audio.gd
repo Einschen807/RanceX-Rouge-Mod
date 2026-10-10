@@ -4,8 +4,9 @@ const STREAMS := {
 	"cursor": preload("res://assets/audio/ui_cursor.ogg"),
 	"click": preload("res://assets/audio/ui_click.ogg"),
 	"cancel": preload("res://assets/audio/ui_cancel.ogg"),
+	"map_circle": preload("res://assets/audio/map_circle.wav"),
 }
-var play_counts := {"cursor": 0, "click": 0, "cancel": 0}
+var play_counts := {"cursor": 0, "click": 0, "cancel": 0, "map_circle": 0}
 var _voices: Array[AudioStreamPlayer] = []
 var _next_voice := 0
 

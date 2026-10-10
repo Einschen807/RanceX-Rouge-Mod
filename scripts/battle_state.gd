@@ -5,6 +5,8 @@ signal changed
 signal log_added(message: String)
 signal status_event(side: String, id: int, event: String)
 signal support_event(side: String, uid: int, event: String)
+signal relic_triggered(display_name: String)
+var pending_relic_feedback: Array[Dictionary] = []
 var support_groups := {"player": [], "enemy": []}
 var support_turns := {"player": 0, "enemy": 0}
 var next_support_uid := 1
@@ -26,6 +28,8 @@ var combo := 0
 var combo_limit := 13
 var player_hp := 0.0
 var player_max_hp := 0.0
+## Negative preserves encyclopedia/debug full-HP preparation; runs carry persistent damage.
+var entry_missing_hp := -1.0
 var enemy_hp := 0.0
 var enemy_max_hp := 0.0
 var player_at_bonus := 0.0
@@ -65,10 +69,12 @@ func configure(state: TroopState, monsters: MonsterCatalog, identity: String) ->
 	next_support_uid = 1
 	pending_support_skills.clear()
 	pending_support_feedback.clear()
+	pending_relic_feedback.clear()
 	pending_down_replacements.clear()
 	troop.down_cards.clear()
 	troop.retired_characters.clear()
 	troop.battle_active = false
+	troop.bonus_edit_locked = false
 	enemy_down = false
 	player_statuses.clear()
 	enemy_statuses.clear()
@@ -101,7 +107,7 @@ func can_swap() -> bool:
 
 func sync_formation(previous_leaders: Array[String] = []) -> void:
 	player_max_hp = troop.total("hp")
-	player_hp = player_max_hp if phase == "preparation" else minf(player_hp, player_max_hp)
+	player_hp = (maxf(0.0, player_max_hp - entry_missing_hp) if entry_missing_hp >= 0.0 else player_max_hp) if phase == "preparation" else minf(player_hp, player_max_hp)
 	ap = mini(ap, ap_max())
 	if phase != "preparation":
 		for name: String in troop.leaders:
@@ -116,6 +122,7 @@ func start() -> bool:
 	preparation_checkpoint = BattleCheckpoint.capture(self)
 	phase = "player"
 	troop.battle_active = true
+	troop.bonus_edit_locked = true
 	ap = mini(3, ap_max())
 	next_swap_round = 1 + swap_interval()
 	log_message("战斗开始：" + monster.name)
@@ -249,7 +256,7 @@ func finish_enemy_turn() -> void:
 	enemy_runtime.next_turn()
 	phase = "player"
 	player_has_acted = false
-	var recovery := 3 + (1 if troop.bonuses.get(4, false) and round % 2 == 0 else 0)
+	var recovery := 2 + (1 if troop.bonuses.get(4, false) and round % 2 == 0 else 0)
 	if has_status("player", BattleStatusEffects.FEAR):
 		recovery -= 1
 		_status_feedback("player", BattleStatusEffects.FEAR, "trigger")
@@ -264,6 +271,7 @@ func _turn_start() -> void:
 	_choose_intent()
 	_start_status_turn("player")
 	if phase != "result": BattleSupports.begin_turn(self, "player")
+	if phase == "player": RelicEffects.turn_start(self)
 	for name: String in troop.leaders:
 		if name.is_empty() or phase != "player":
 			continue
@@ -590,6 +598,7 @@ func _check_result() -> void:
 		outcome = "败北"
 	if not outcome.is_empty():
 		phase = "result"
+		troop.bonus_edit_locked = true
 		log_message(outcome)
 
 func log_message(message: String) -> void:
@@ -600,6 +609,7 @@ func log_message(message: String) -> void:
 
 func finish() -> void:
 	troop.battle_active = false
+	troop.bonus_edit_locked = false
 	pending_down_replacements.clear()
 	troop.down_cards.clear()
 	troop.retired_characters.clear()

@@ -14,6 +14,7 @@ var selected := false:
 		refresh_art()
 var art: OriginalFlatPlayer
 var content: Control
+var selected_offset := Vector2(0, -14)
 var _hover := false
 var _down := false
 var _state := ""
@@ -57,7 +58,7 @@ func refresh_art() -> void:
 	if state != _state:
 		_state = state
 		art.load_animation(path)
-	var offset := Vector2(0, -14) if kind == "tab" and selected else Vector2.ZERO
+	var offset := selected_offset if kind == "tab" and selected else Vector2.ZERO
 	art.position = offset
 	content.position = offset
 

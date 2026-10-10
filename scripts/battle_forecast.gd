@@ -16,11 +16,15 @@ static func snapshot(source: BattleState) -> BattleState:
 	# DOWN and replacement must never mutate the live formation from a hover forecast.
 	var formation := TroopState.new()
 	formation.catalog = source.troop.catalog
+	formation.relics.assign(source.troop.relics)
+	formation.relic_counters = source.troop.relic_counters.duplicate(true)
 	formation.available.assign(source.troop.available)
 	formation.leaders.assign(source.troop.leaders)
 	for field: String in ["levels", "bonuses", "damage_rates", "resistance_rates", "down_cards", "retired_characters"]: formation.set(field, source.troop.get(field).duplicate(true))
 	formation.ox_coefficient = source.troop.ox_coefficient
 	formation.battle_active = source.troop.battle_active
+	formation.bonus_edit_locked = source.troop.bonus_edit_locked
+	formation.encyclopedia_mode = source.troop.encyclopedia_mode
 	copy.troop = formation
 	copy.database = source.database
 	copy.monster = source.monster.duplicate(true)

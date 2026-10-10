@@ -4,9 +4,9 @@ class_name FormationArt
 const GOLD := Color(0.97, 0.84, 0.46)
 static func picture(parent: Node, asset: String, at: Vector2, dimensions: Vector2) -> TextureRect:
 	var node := TextureRect.new()
+	node.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	node.texture = load("res://assets/formation/%s.png" % asset)
 	node.position = at
-	node.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	node.size = dimensions
 	node.stretch_mode = TextureRect.STRETCH_SCALE
 	node.mouse_filter = Control.MOUSE_FILTER_IGNORE

@@ -2,6 +2,7 @@ extends Node
 ## A single active run, saved only at root-node entry. No manual-save UI or slots.
 signal entry_loaded(entry: Dictionary)
 signal save_failed(message: String)
+signal checkpoint_changed
 const VERSION := 1
 const SAVE_PATH := "user://run_checkpoint.json"
 const BACKUP_PATH := SAVE_PATH + ".bak"
@@ -32,6 +33,7 @@ func enter_node(id: String, kind: String, initial_node: Dictionary, progress: Di
 	if error != OK: return error
 	_entry = entry
 	_node_active = true
+	checkpoint_changed.emit()
 	return OK
 
 func enter_subscene(kind: String, context: Dictionary = {}) -> bool:
@@ -76,6 +78,28 @@ func resume(troop: TroopState) -> Dictionary:
 
 func entry_snapshot() -> Dictionary:
 	return _entry.duplicate(true)
+
+func peek_entry(catalog: CardCatalog) -> Dictionary:
+	var previous_error := last_error
+	var entry := _read(SAVE_PATH, catalog)
+	if entry.is_empty() and last_error != "存档版本高于当前游戏版本":
+		entry = _read(BACKUP_PATH, catalog)
+	last_error = previous_error
+	return entry
+
+func discard_run() -> Error:
+	# Remove the recovery copy as well, so an abandoned run cannot return via fallback.
+	for path: String in [TEMP_PATH, BACKUP_PATH, SAVE_PATH]:
+		if not FileAccess.file_exists(path): continue
+		var error := DirAccess.remove_absolute(path)
+		if error != OK: return _fail("无法清除本局存档。", error)
+	run_id = ""
+	_entry.clear()
+	_subscenes.clear()
+	_node_active = false
+	last_error = ""
+	checkpoint_changed.emit()
+	return OK
 
 func _commit(entry: Dictionary, catalog: CardCatalog) -> Error:
 	var file := FileAccess.open(TEMP_PATH, FileAccess.WRITE)

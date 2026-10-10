@@ -5,6 +5,7 @@ const STRATEGIST := 40
 const BARRIER := 41
 const EXPLOSION := 42
 const ATTACK_SEAL := 43
+const DAMAGE_BLOCK := 44
 
 static func group(state: BattleState, side: String) -> Array:
 	return state.support_groups[side]
@@ -137,6 +138,12 @@ static func after_action(state: BattleState, side: String) -> void:
 		state._check_result()
 
 static func absorb(state: BattleState, side: String, command: Dictionary, potential: float) -> bool:
+	if side == "player" and command.get("kind", "") == "damage" and command.get("target", "opponent") != "self" and potential > 0.0:
+		var blocks := effects(state, side, DAMAGE_BLOCK)
+		if not blocks.is_empty():
+			remove(state, side, blocks[0].entry.uid, "trigger")
+			state.pending_support_feedback.append({"side": side, "event": "barrier_block", "damage": 0.0})
+			return true
 	var barriers := effects(state, side, BARRIER)
 	if barriers.is_empty() or potential <= 0.0: return false
 	var breaker: bool = String(command.get("actor_identity", "")) in ["兰斯", "健太郎"] and not command.get("support_source", false) and command.get("kind", "") == "damage"

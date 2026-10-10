@@ -46,6 +46,7 @@ var _player_number: BattleHpReadout
 var _round: OriginalBitmapNumber
 var _log: Label
 var _result: Control
+var reward_pool := 1
 var _breath: Tween
 var _effect_clock := 0.0
 var _presentation: BattlePresentation
@@ -428,9 +429,44 @@ func _refresh() -> void:
 	_apply_speed(self)
 	_refresh_analysis_forecast()
 	if battle.phase == "result" and not input_locked and not is_instance_valid(_result):
-		_result = _popup_frame(Vector2(655, 300), Vector2(610, 340))
-		BattleArt.label(_result, battle.outcome, Vector2(30, 30), Vector2(550, 100), 56, FormationArt.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
-		BattleArt.text_button(_result, "返回", Vector2(205, 235), Vector2(200, 65), func() -> void: close_requested.emit())
+		if battle.outcome == "胜利":
+			_show_combat_end()
+		else:
+			_result = _popup_frame(Vector2(655, 300), Vector2(610, 340))
+			BattleArt.label(_result, battle.outcome, Vector2(30, 30), Vector2(550, 100), 56, FormationArt.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+			BattleArt.text_button(_result, "返回", Vector2(205, 235), Vector2(200, 65), func() -> void: close_requested.emit())
+
+func _show_combat_end() -> void:
+	input_locked = true
+	_close_popup()
+	_clear_skill_preview()
+	_result = Control.new()
+	_result.name = "CombatEnd"
+	_result.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_result.add_to_group("modal_overlay")
+	add_child(_result)
+	var end := TreasureArt.flat(_result, "combat_end")
+	end.playback_speed = 3.0
+	# Original WinLoseView finishes this native animation before leaving combat.
+	while not end.is_root_finished():
+		await get_tree().process_frame
+	# Shared transition changes the page only after a completely black frame.
+	var transition := get_node("/root/ScreenTransition")
+	while transition.busy: await get_tree().process_frame
+	await transition.play(_mount_victory_loot)
+	input_locked = false
+
+func _mount_victory_loot() -> void:
+	_result.remove_from_group("modal_overlay")
+	_result.hide()
+	_result.queue_free()
+	var loot := VictoryLootScreen.new()
+	loot.troop = battle.troop
+	loot.pool_id = reward_pool
+	loot.rng = get_node("/root/RunAutosave").rng
+	loot.completed.connect(func() -> void: close_requested.emit())
+	_result = loot
+	add_child(loot)
 
 func _refresh_intents() -> void:
 	BattleArt.clear(_intents)
@@ -480,7 +516,10 @@ func _refresh_cards() -> void:
 		for replacement: Dictionary in battle.pending_down_replacements:
 			if int(replacement.slot) == i: name = replacement.previous
 		if name.is_empty():
-			BattleArt.picture(_cards, "card_frame", Vector2(198 + 218 * i, 728))
+			if not battle.troop.is_slot_unlocked(i):
+				FormationArt.picture(_cards, "locked", Vector2(200 + 218 * i, 730), Vector2(208, 312))
+			else:
+				BattleArt.picture(_cards, "card_frame", Vector2(198 + 218 * i, 728))
 			continue
 		var card := BattleCard.new()
 		card.configure(battle, name, operation_mode, selected_card == name, input_locked)
@@ -602,6 +641,7 @@ func ap_position(index: int) -> Vector2:
 	return Vector2((1920.0 - texture.get_width()) / 2.0 + 74 + index * 53, 658)
 
 func _apply_speed(node: Node) -> void:
+	if node == _result or node is VictoryLootScreen: return
 	if node is BattleApBar:
 		node.playback_speed = animation_speed()
 	if node is OriginalFlatPlayer:

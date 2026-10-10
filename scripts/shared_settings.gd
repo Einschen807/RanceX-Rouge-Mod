@@ -1,7 +1,10 @@
 extends CanvasLayer
 signal opened
-## Both title Settings and battle MENU open this same panel and audio buses.
+## Title, battle MENU and map gear share a two-level native settings menu.
 var panel: Control
+var menu: NativeSettingsMenu
+var details: NativeSettingsPage
+var _closing := false
 var config := ConfigFile.new()
 enum CutInMode { NEVER, ALWAYS, LETHAL }
 const AUDIO_BUSES := ["Music", "SFX", "Voice"]
@@ -57,86 +60,73 @@ func _ready() -> void:
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
 
 func open() -> void:
-	if is_instance_valid(panel):
-		return
+	if is_instance_valid(panel) or get_node("/root/ScreenTransition").busy: return
 	opened.emit()
 	panel = Control.new()
 	panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(panel)
 	panel.add_to_group("modal_overlay")
-	var shade := ColorRect.new()
-	shade.color = Color(0, 0, 0, 0.7)
-	panel.add_child(shade)
-	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	var frame := Panel.new()
-	frame.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	frame.offset_left = -480
-	frame.offset_top = -360
-	frame.offset_right = 480
-	frame.offset_bottom = 360
-	frame.add_theme_stylebox_override("panel", BattleArt.panel_style())
-	panel.add_child(frame)
-	BattleArt.label(frame, "设置", Vector2(35, 20), Vector2(890, 60), 36, FormationArt.GOLD)
-	BattleArt.label(frame, "音量", Vector2(45, 85), Vector2(850, 40), 27, FormationArt.GOLD)
-	for i: int in range(AUDIO_BUSES.size()):
-		var bus: String = AUDIO_BUSES[i]
-		BattleArt.label(frame, ["音乐音量", "音效音量", "语音音量"][i], Vector2(45, 135 + i * 75), Vector2(220, 45), 27)
-		var slider := HSlider.new()
-		slider.name = bus + "Volume"
-		slider.position = Vector2(280, 125 + i * 75)
-		slider.size = Vector2(470, 62)
-		slider.min_value = 0.0
-		slider.max_value = 1.0
-		slider.step = 0.01
-		slider.value = audio_volume(bus)
-		var meter := StyleBoxTexture.new()
-		meter.texture = load("res://assets/battle/native/settings_meter_ground/lib_0.png")
-		meter.texture_margin_left = 8
-		meter.texture_margin_right = 8
-		meter.texture_margin_top = 31
-		meter.texture_margin_bottom = 31
-		slider.add_theme_stylebox_override("slider", meter)
-		slider.add_theme_stylebox_override("grabber_area", StyleBoxEmpty.new())
-		slider.add_theme_stylebox_override("grabber_area_highlight", StyleBoxEmpty.new())
-		slider.add_theme_icon_override("grabber", load("res://assets/battle/native/settings_meter_normal/atlas_0_1.png"))
-		slider.add_theme_icon_override("grabber_highlight", load("res://assets/battle/native/settings_meter_hover/atlas_0_1.png"))
-		slider.add_theme_icon_override("grabber_disabled", load("res://assets/battle/native/settings_meter_normal/atlas_0_1.png"))
-		var value_label := BattleArt.label(frame, "%d%%" % roundi(slider.value * 100), Vector2(800, 135 + i * 75), Vector2(100, 45), 24)
-		slider.value_changed.connect(func(value: float) -> void:
-			value_label.text = "%d%%" % roundi(value * 100)
-			set_audio_volume(bus, value))
-		frame.add_child(slider)
-	BattleArt.label(frame, "演出动画", Vector2(45, 430), Vector2(850, 40), 27, FormationArt.GOLD)
-	BattleArt.label(frame, "必杀演出", Vector2(45, 480), Vector2(850, 40), 25)
-	var switch_group := ButtonGroup.new()
-	for index: int in range(3):
-		var option := BattleArt.text_button(frame, ["不播放演出", "每次播放演出", "仅致命一击时播放"][index], Vector2(45 + index * 290, 525), Vector2(275, 65), set_cut_in_mode.bind(index))
-		option.name = "CutInMode%d" % index
-		option.toggle_mode = true
-		option.button_group = switch_group
-		option.set_pressed_no_signal(cut_in_mode() == index)
-		option.selected = option.button_pressed
-		option.toggled.connect(func(value: bool) -> void: option.selected = value)
-	var fullscreen := BattleArt.button(frame, "settings_check", Vector2(45, 350), Vector2(60, 60), func() -> void: pass)
-	fullscreen.toggle_mode = true
-	fullscreen.button_pressed = DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
-	fullscreen.selected = fullscreen.button_pressed
-	BattleArt.label(frame, "全屏显示", Vector2(120, 360), Vector2(400, 45), 27)
-	fullscreen.toggled.connect(func(value: bool) -> void:
-		fullscreen.selected = value
-		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN if value else DisplayServer.WINDOW_MODE_WINDOWED)
-		config.set_value("display", "fullscreen", value)
-		config.save("user://settings.cfg"))
-	BattleArt.text_button(frame, "返回", Vector2(740, 625), Vector2(170, 60), close)
+	menu = NativeSettingsMenu.new()
+	menu.settings_requested.connect(_show_settings)
+	menu.title_requested.connect(_return_title)
+	menu.abandon_requested.connect(_abandon)
+	menu.back_requested.connect(close)
+	panel.add_child(menu)
+
+func _show_settings() -> void:
+	if _closing or is_instance_valid(details): return
+	menu.hide()
+	details = NativeSettingsPage.new()
+	details.back_requested.connect(_back_to_menu)
+	details.title_requested.connect(_return_title)
+	panel.add_child(details)
+
+func _back_to_menu() -> void:
+	if not is_instance_valid(details): return
+	panel.remove_child(details)
+	details.queue_free()
+	details = null
+	menu.show()
+	menu.refresh_actions()
+	get_node("/root/UIAudio").play("cancel")
+
+func _return_title() -> void:
+	if get_node("/root/ScreenTransition").busy: return
+	_dispose()
+	get_node("/root/RunSession").return_to_title()
+
+func _abandon() -> void:
+	var session := get_node("/root/RunSession")
+	if session.abandon():
+		_dispose()
+	elif is_instance_valid(menu):
+		menu.error_label.text = session.error
 
 func close() -> void:
+	if not is_instance_valid(panel) or _closing: return
+	_closing = true
+	if is_instance_valid(details):
+		panel.remove_child(details)
+		details.queue_free()
+		details = null
+		menu.show()
+	await menu.slide_out()
+	_dispose()
+	get_node("/root/UIAudio").play("cancel")
+
+func _dispose() -> void:
 	if is_instance_valid(panel):
 		panel.remove_from_group("modal_overlay")
+		remove_child(panel)
 		panel.queue_free()
-		panel = null
-		get_node("/root/UIAudio").play("cancel")
+	panel = null
+	menu = null
+	details = null
+	_closing = false
 
 func _input(event: InputEvent) -> void:
 	if is_instance_valid(panel) and event.is_action_pressed("ui_cancel"):
 		get_viewport().set_input_as_handled()
-		close()
+		if _closing: return
+		if is_instance_valid(details): _back_to_menu()
+		else: close()

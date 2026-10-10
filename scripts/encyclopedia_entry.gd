@@ -5,7 +5,7 @@ class_name EncyclopediaEntry
 @export var entry_id: StringName
 @export var title_text: String
 @export var description_text: String
-@export_enum("cards", "relics", "potions") var illustration: String = "cards"
+@export_enum("cards", "relics") var illustration: String = "cards"
 
 var visual: Control
 var caption: Label
@@ -45,8 +45,6 @@ func _ready() -> void:
 		_card(Vector2(144, 159), 0.0, "card_back", "card_rance")
 	elif illustration == "relics":
 		_picture("res://assets/encyclopedia/chest.png", Vector2(54, 165), Vector2(312, 281))
-	else:
-		_picture("res://assets/encyclopedia/potion.png", Vector2(64, 168), Vector2(292, 292))
 	_label(description_text, Vector2(20, 474), Vector2(380, 54), 28, Color(0.93, 0.90, 0.81))
 	mouse_entered.connect(func() -> void: pointer_inside = true; _refresh())
 	mouse_exited.connect(func() -> void: pointer_inside = false; _refresh())

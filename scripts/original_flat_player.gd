@@ -13,6 +13,8 @@ var hidden_libraries: PackedStringArray = []
 var texture_overrides: Dictionary = {}
 ## Native UI hover tint, inherited by every nested timeline.
 var tint_add := Vector3.ZERO
+## Overlays can draw their glow without sampling a lower scene's screen buffer.
+var screen_filter_shader: Shader
 
 const MIX_SHADER: Shader = preload("res://shaders/flat_mix.gdshader")
 const ADD_SHADER: Shader = preload("res://shaders/flat_add.gdshader")
@@ -282,7 +284,7 @@ func shader_for_filter(filter: int) -> Shader:
 	match filter:
 		1: return ADD_SHADER
 		2: return MULTIPLY_SHADER
-		3: return SCREEN_SHADER
+		3: return screen_filter_shader if screen_filter_shader != null else SCREEN_SHADER
 	return MIX_SHADER
 
 func sequence_texture(library: String, frame: int) -> String:

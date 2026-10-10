@@ -2,6 +2,11 @@ extends RefCounted
 class_name TroopState
 ## Shared formation model. Encyclopedia creates its own state, never granting run inventory.
 signal changed
+signal troop_leveled_up(count: int)
+signal relic_acquired(display_name: String, source_position: Vector2)
+var relics: Array[String] = []
+## Acquired relic progress belongs to the run, surviving battle boundaries.
+var relic_counters: Dictionary = {}
 var catalog: CardCatalog
 var available: Array[Dictionary] = []
 var leaders: Array[String] = ["", "", "", "", "", "", ""]
@@ -12,15 +17,62 @@ var bonuses: Dictionary = {}
 var damage_rates := {"physical": 0.0, "magic": 0.0}
 var resistance_rates := {"physical": 0.0, "magic": 0.0}
 var bonus_points := 0
+var medals := 0
+var gold := 99
+var medal_progress := 0
+var troop_level := 0
+## Percentage-point bonus shared by all treasure pools, reset on an offered rare.
+var rare_card_bias := 0
 var encyclopedia_mode := false
 ## Battle-only DOWN records; do not affect deployment AT or owned faction stats.
 var down_cards: Dictionary = {}
 ## Original battle replacement excludes every card of a retired character.
 var retired_characters: Dictionary = {}
 var battle_active := false
+## Locks after Start through the result page; preparation remains editable.
+var bonus_edit_locked := false
 var skill_runtime := SkillRuntime.new()
 const DEPLOYMENT_ORDER := [3, 2, 4, 1, 5, 0, 6]
 const BONUS_NAMES := ["增加领队格子 +1", "增加领队格子 +1", "增加领队格子 +1", "AP最大值强化 6→10", "AP恢复强化 偶数回合+1", "更换领队", "神魔阵营解禁", "强化出现概率 +100%", "HP增加 +30%", "物理伤害增加 +30%", "魔法伤害增加 +30%", "哈尼打火机", "全面强化 +3%", "全面强化 +3%", "上限解除 +25%", "上限解除 +25%"]
+## Keep stable saved bonus IDs; retired choices are never displayed or acquired.
+const BONUS_IDS := [0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 12, 13, 14, 15]
+
+func add_gold(amount: int) -> void:
+	if amount <= 0: return
+	gold += amount
+	changed.emit()
+
+func spend_gold(amount: int) -> bool:
+	if amount < 0 or gold < amount: return false
+	gold -= amount
+	changed.emit()
+	return true
+
+func add_medals(amount: int) -> void:
+	if amount <= 0: return
+	medals += amount
+	var progress := medal_progress + amount
+	var gained := int(progress / 3)
+	medal_progress = progress % 3
+	troop_level += gained
+	bonus_points += gained
+	changed.emit()
+	if gained > 0: troop_leveled_up.emit(gained)
+
+func spend_medals(amount: int) -> bool:
+	if amount < 0 or medals < amount: return false
+	medals -= amount
+	changed.emit()
+	return true
+
+func leader_capacity() -> int:
+	return 4 + int(bonuses.get(0, false)) + int(bonuses.get(1, false)) + int(bonuses.get(2, false))
+
+func is_slot_unlocked(slot: int) -> bool:
+	return slot >= 0 and slot < leaders.size() and slot in DEPLOYMENT_ORDER.slice(0, leader_capacity())
+
+func rate_cap() -> float:
+	return 49.0 + 25.0 * (int(bonuses.get(14, false)) + int(bonuses.get(15, false)))
 
 func configure(database: CardCatalog, encyclopedia: bool, owned_names: Array[String] = []) -> void:
 	catalog = database
@@ -37,6 +89,24 @@ func configure(database: CardCatalog, encyclopedia: bool, owned_names: Array[Str
 func has_card(display_name: String) -> bool:
 	return available.any(func(c: Dictionary) -> bool: return c.name == display_name)
 
+func acquire_card(display_name: String) -> void:
+	var card := catalog.find_name(display_name)
+	if card.is_empty(): return
+	if has_card(display_name): levels[display_name] = level(display_name) + 1
+	else: available.append(card)
+	# Newly obtained cards remain in inventory, without deploying a leader.
+	changed.emit()
+
+func acquire_relic(display_name: String, source_position := Vector2(960, 540)) -> bool:
+	if display_name in relics: return false
+	var database := RelicCatalog.new()
+	if not database.load_catalog() or not database.by_name.has(display_name): return false
+	relics.append(display_name)
+	if RelicEffects.PERIODS.has(display_name): relic_counters[display_name] = 0
+	changed.emit()
+	relic_acquired.emit(display_name, source_position)
+	return true
+
 func level(display_name: String) -> int:
 	return int(levels.get(display_name, 0))
 
@@ -49,6 +119,13 @@ func actual(card: Dictionary, stat: String, preview_upgrades: bool = false) -> f
 	# Preview uses upgraded base values with the owned card's stars; it never writes inventory.
 	var display_card := catalog.upgrade_preview(card) if preview_upgrades else card
 	return float(display_card["base_" + stat]) * pow(1.0 + 0.12 * level(card.name), 2.5)
+
+func acquisition_gain(card: Dictionary, stat: String, preview_upgrades: bool = false) -> float:
+	var owned := has_card(card.name)
+	var next_level := level(card.name) + (1 if owned else 0)
+	var display_card := catalog.upgrade_preview(card) if preview_upgrades else card
+	var next_value := float(display_card["base_" + stat]) * pow(1.0 + 0.12 * next_level, 2.5)
+	return next_value - (actual(card, stat, preview_upgrades) if owned else 0.0)
 
 func leader_for_faction(faction: int) -> String:
 	for display_name: String in leaders:
@@ -96,11 +173,12 @@ func deployment_slot(display_name: String) -> int:
 	if not has_card(display_name) or is_unavailable(display_name):
 		return -1
 	var faction: int = catalog.find_name(display_name).faction
+	if faction == 10 and not encyclopedia_mode and not bonuses.get(6, false): return -1
 	var previous := leader_for_faction(faction)
 	if not previous.is_empty():
 		return leaders.find(previous)
 	for slot: int in DEPLOYMENT_ORDER:
-		if leaders[slot].is_empty():
+		if is_slot_unlocked(slot) and leaders[slot].is_empty():
 			return slot
 	return -1
 
@@ -109,7 +187,7 @@ func is_unavailable(display_name: String) -> bool:
 
 func move_leader(display_name: String, target: int) -> bool:
 	var source := leaders.find(display_name)
-	if source < 0 or target < 0 or target >= leaders.size() or source == target:
+	if source < 0 or not is_slot_unlocked(target) or source == target:
 		return false
 	var displaced := leaders[target]
 	leaders[target] = display_name
@@ -127,19 +205,41 @@ func remove(display_name: String) -> void:
 
 func rate(kind: String) -> float:
 	var all := 3.0 * (int(bonuses.get(12, false)) + int(bonuses.get(13, false)))
+	var value := 0.0
 	match kind:
-		"hp": return all + (30.0 if bonuses.get(8, false) else 0.0)
-		"physical": return float(damage_rates.physical) + all + (30.0 if bonuses.get(9, false) else 0.0)
-		"magic": return float(damage_rates.magic) + all + (30.0 if bonuses.get(10, false) else 0.0)
-		"physical_resist": return float(resistance_rates.physical)
-		"magic_resist": return float(resistance_rates.magic)
-	return 0.0
+		"hp": value = all + (30.0 if bonuses.get(8, false) else 0.0)
+		"physical": value = float(damage_rates.physical) + all + (30.0 if bonuses.get(9, false) else 0.0)
+		"magic": value = float(damage_rates.magic) + all + (30.0 if bonuses.get(10, false) else 0.0)
+		"physical_resist": value = float(resistance_rates.physical)
+		"magic_resist": value = float(resistance_rates.magic)
+	return minf(value, rate_cap())
+
+func can_toggle_bonus(index: int) -> bool:
+	if index not in BONUS_IDS or bonus_edit_locked or battle_active: return false
+	if encyclopedia_mode or bonuses.get(index, false): return true
+	if bonus_points < 1: return false
+	return not (index in [1, 2, 13, 15] and not bonuses.get(index - 1, false))
 
 func toggle_bonus(index: int) -> bool:
-	if index < 0 or index >= BONUS_NAMES.size():
-		return false
-	if not encyclopedia_mode:
-		return false # Real acquisition is provided by the future run reward flow.
-	bonuses[index] = not bonuses.get(index, false)
+	if not can_toggle_bonus(index): return false
+	var was_enabled: bool = bonuses.get(index, false)
+	if not encyclopedia_mode: bonus_points += 1 if was_enabled else -1
+	bonuses[index] = not was_enabled
+	if was_enabled and index in [0, 1, 2, 6]: _normalize_leaders()
 	changed.emit()
 	return true
+
+func _normalize_leaders() -> void:
+	# Closing a slot unequips its card, then reuses another open slot if possible.
+	# Inventory and card levels are retained when the reduced formation is full.
+	var displaced: Array[String] = []
+	for slot: int in range(leaders.size()):
+		var name := leaders[slot]
+		if name.is_empty(): continue
+		var god_locked: bool = not encyclopedia_mode and not bonuses.get(6, false) and catalog.find_name(name).faction == 10
+		if not is_slot_unlocked(slot) or god_locked:
+			leaders[slot] = ""
+			if not god_locked: displaced.append(name)
+	for name: String in displaced:
+		var slot := deployment_slot(name)
+		if slot >= 0: leaders[slot] = name

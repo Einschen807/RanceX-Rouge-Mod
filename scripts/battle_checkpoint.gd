@@ -44,5 +44,6 @@ static func restore(source: BattleState, data: Dictionary) -> BattleState:
 		else: result.set(field, value.duplicate(true) if value is Dictionary else value)
 	result.preparation_checkpoint = data.duplicate(true)
 	result.animate_automatic_skills = source.animate_automatic_skills
+	result.entry_missing_hp = source.entry_missing_hp
 	result.troop.changed.emit()
 	return result

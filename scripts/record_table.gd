@@ -33,5 +33,26 @@ static func parse(source: String) -> Dictionary:
 		return {"error": "末尾记录缺少分号或引号未闭合", "rows": []}
 	return {"error": "", "rows": rows}
 
+static func pool_names(path: String) -> Dictionary:
+	if not FileAccess.file_exists(path): return {"names": [], "error": "池文件不存在：" + path}
+	var source := ""
+	for line: String in FileAccess.get_file_as_string(path).split("\n"):
+		if not line.strip_edges().begins_with("#"): source += line + "\n"
+	source = source.replace("；", ";").strip_edges()
+	if not source.ends_with(";"): return {"names": [], "error": "池记录缺少分号"}
+	var names: Array[String] = []
+	for raw: String in source.split(";", false):
+		var record := raw.strip_edges()
+		if record.is_empty(): continue
+		if not record.begins_with("{") or not record.ends_with("}"): return {"names": [], "error": "池名称须使用{名称};"}
+		var name := record.substr(1, record.length() - 2).strip_edges()
+		if name.begins_with('"'):
+			var quoted: Variant = JSON.parse_string(name)
+			if not quoted is String: return {"names": [], "error": "池记录只能填写名称"}
+			name = quoted
+		if name.is_empty() or name.contains(",") or name.contains("{") or name.contains("}") or name in names: return {"names": [], "error": "池名称为空、重复或包含成员"}
+		names.append(name)
+	return {"names": names, "error": ""}
+
 static func integer(value: Variant) -> bool:
 	return (value is int or value is float) and float(value) == floor(float(value))

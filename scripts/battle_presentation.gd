@@ -73,8 +73,12 @@ func _play_cut_in(skill: Dictionary, acting_card: CardWidget = null) -> void:
 	_cut_in_players.erase(player)
 	if is_instance_valid(cut_in):
 		cut_in.hide()
+		# Kenshin's short background can hand off an independently owned voice tail.
+		# Other cut-ins retain their existing wait for the complete voice.
+		if cut_in.has_method("release_voice_tail"):
+			cut_in.call("release_voice_tail")
 		# Preserve a short audio tail if the visual wipe finishes between mix frames.
-		if cut_in is CutInCardBurst and cut_in.voice_player.playing:
+		elif cut_in is CutInCardBurst and cut_in.voice_player.playing:
 			await cut_in.voice_player.finished
 		cut_in.queue_free()
 
@@ -153,6 +157,11 @@ func _banner(actor: String, skill: Dictionary, enemy: bool, support := false) ->
 	return banner
 
 func automatic_actions() -> void:
+	while not view.battle.pending_relic_feedback.is_empty():
+		var feedback: Dictionary = view.battle.pending_relic_feedback.pop_front()
+		native("damage_flash", Vector2(960, 350))
+		if float(feedback.damage) > 0.0: _damage(float(feedback.damage), Vector2(960, 350))
+		await view._wait_animation(0.45 / view.animation_speed())
 	await support_actions("player")
 	while not view.battle.pending_automatic_skills.is_empty() and view.battle.phase == "player":
 		var entry: Dictionary = view.battle.pending_automatic_skills.pop_front()

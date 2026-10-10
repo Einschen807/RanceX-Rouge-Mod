@@ -39,6 +39,8 @@ var _details: OriginalUiButton
 var _upgrade_checkbox: OriginalUiButton
 var _bonus_button: OriginalUiButton
 var _bonus_buttons: Array[Button] = []
+var _bonus_rank: OriginalBitmapNumber
+var _bonus_points: OriginalBitmapNumber
 
 func configure(state: TroopState) -> void:
 	troop = state
@@ -156,18 +158,21 @@ func _summary_number(y: int, percent: bool) -> OriginalBitmapNumber:
 
 func _build_bonuses() -> void:
 	FormationArt.picture(_bonus_area, "bonus_frame", Vector2.ZERO, Vector2(1542, 701))
-	OriginalBitmapNumber.make(_bonus_area, "digits_rank", Vector2(1228, 36), Vector2(40, 30)).text = "0"
-	OriginalBitmapNumber.make(_bonus_area, "digits_point", Vector2(1383, 5), Vector2(72, 64)).text = str(troop.bonus_points)
-	for i: int in range(TroopState.BONUS_NAMES.size()):
+	_bonus_rank = OriginalBitmapNumber.make(_bonus_area, "digits_rank", Vector2(1228, 36), Vector2(40, 30))
+	_bonus_points = OriginalBitmapNumber.make(_bonus_area, "digits_point", Vector2(1383, 5), Vector2(72, 64))
+	for display_index: int in range(TroopState.BONUS_IDS.size()):
+		var i: int = TroopState.BONUS_IDS[display_index]
 		var button := Button.new()
-		button.position = Vector2(26 + (i % 4) * 375, 83 + (i / 4) * 123)
+		button.name = "Bonus%d" % i
+		button.set_meta("bonus_id", i)
+		button.position = Vector2(26 + (display_index % 4) * 375, 83 + (display_index / 4) * 123)
 		button.size = Vector2(365, 123)
 		for pair: Array in [["normal", "bonus_normal"], ["hover", "bonus_hover"], ["pressed", "bonus_pressed"], ["disabled", "bonus_disabled"]]:
 			var style := StyleBoxTexture.new()
 			style.texture = load("res://assets/formation/%s.png" % pair[1])
 			button.add_theme_stylebox_override(pair[0], style)
 		button.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
-		button.disabled = not troop.encyclopedia_mode or not i in [3, 4, 5, 8, 9, 10, 12, 13]
+		button.disabled = not troop.can_toggle_bonus(i)
 		button.pressed.connect(func() -> void: troop.toggle_bonus(i))
 		_bonus_area.add_child(button)
 		get_node("/root/UIAudio").bind_button(button)
@@ -190,8 +195,8 @@ func _refresh() -> void:
 	_clear(_leader_area)
 	for i: int in range(7):
 		var at := Vector2(i * 220, 0)
-		if troop.leaders[i].is_empty():
-			FormationArt.picture(_leader_area, "empty", at, Vector2(208, 312))
+		if not troop.is_slot_unlocked(i) or troop.leaders[i].is_empty():
+			FormationArt.picture(_leader_area, "locked" if not troop.is_slot_unlocked(i) else "empty", at, Vector2(208, 312))
 		else:
 			var widget := _card(catalog.find_name(troop.leaders[i]), true)
 			widget.position = at
@@ -211,8 +216,12 @@ func _refresh() -> void:
 	_summary.hp_rate.text = "%d%%" % int(troop.rate("hp"))
 	_summary.physical.text = "%d%%" % int(troop.rate("physical"))
 	_summary.magic.text = "%d%%" % int(troop.rate("magic"))
-	for i: int in range(_bonus_buttons.size()):
-		_bonus_buttons[i].get_node("Selected").visible = troop.bonuses.get(i, false)
+	_bonus_rank.text = str(troop.troop_level)
+	_bonus_points.text = str(troop.bonus_points)
+	for button: Button in _bonus_buttons:
+		var id: int = button.get_meta("bonus_id")
+		button.get_node("Selected").visible = troop.bonuses.get(id, false)
+		button.disabled = not troop.can_toggle_bonus(id)
 	_clear(_leader_counts)
 	for i: int in range(7):
 		if troop.leaders[i].is_empty():
@@ -369,6 +378,10 @@ func _release_drag(point: Vector2) -> void:
 			art.queue_free()
 			_refresh()
 			return
+	if not troop.is_slot_unlocked(target):
+		art.queue_free()
+		_refresh()
+		return
 	_cancel_flight(target)
 	if source_slot >= 0:
 		_cancel_flight(source_slot)

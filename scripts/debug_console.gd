@@ -14,7 +14,7 @@ func _ready() -> void:
 	frame.size = panel.size
 	frame.add_theme_stylebox_override("panel", BattleArt.panel_style())
 	panel.add_child(frame)
-	BattleArt.label(frame, "控制台  ·  battle 怪物识别名", Vector2(24, 10), Vector2(1850, 40), 25, FormationArt.GOLD)
+	BattleArt.label(frame, "控制台  ·  shop / gold 数量 / battle 怪物名 / treasure 0～3 / relic / add relic 遗物名 / add card 卡牌名", Vector2(24, 10), Vector2(1850, 40), 25, FormationArt.GOLD)
 	output = RichTextLabel.new()
 	output.position = Vector2(24, 58)
 	output.size = Vector2(1872, 190)
@@ -53,13 +53,43 @@ func execute(command: String) -> void:
 	output.append_text("> " + command + "\n")
 	entry.clear()
 	var split := command.split(" ", false, 1)
-	if split.size() == 2 and split[0].to_lower() == "battle":
+	if command.to_lower() == "shop":
+		var message: String = get_node("/root/ShopManager").launch()
+		output.append_text(message + "\n")
+		if message.begins_with("进入商店"): close()
+	elif split[0].to_lower() == "gold":
+		var argument := split[1].strip_edges() if split.size() == 2 else ""
+		var amount := int(argument) if argument.is_valid_int() else 0
+		var source: TroopState = get_node("/root/BattleManager").current_troop()
+		if source == null: output.append_text("数据加载失败。\n")
+		elif amount <= 0 or amount > 9223372036854775807 - source.gold: output.append_text("用法：gold 正整数数量\n")
+		else:
+			source.add_gold(amount)
+			output.append_text("获得贝壳：%d\n" % amount)
+			close()
+	elif split[0].to_lower() == "relic":
+		var message: String = get_node("/root/BattleManager").launch_relic(split[1].strip_edges() if split.size() == 2 else "默认遗物池")
+		output.append_text(message + "\n")
+		if message.begins_with("打开遗物宝箱"): close()
+	elif split.size() == 2 and split[0].to_lower() == "add":
+		var args := split[1].split(" ", false, 1)
+		if args.size() == 2 and args[0].to_lower() in ["relic", "card"]:
+			var message: String = get_node("/root/BattleManager").grant(args[0].to_lower(), args[1].strip_edges())
+			output.append_text(message + "\n")
+			if message.begins_with("获得"): close()
+		else: output.append_text("用法：add relic 遗物名称 / add card 卡牌名称\n")
+	elif split.size() == 2 and split[0].to_lower() == "battle":
 		var message: String = get_node("/root/BattleManager").launch(split[1].strip_edges())
 		output.append_text(message + "\n")
 		if message.begins_with("进入战斗"):
 			close()
+	elif split.size() == 2 and split[0].to_lower() == "treasure":
+		var argument := split[1].strip_edges()
+		var message: String = get_node("/root/BattleManager").launch_treasure(int(argument)) if argument in ["0", "1", "2", "3"] else "用法：treasure 0|1|2|3"
+		output.append_text(message + "\n")
+		if message.begins_with("打开宝箱"): close()
 	else:
-		output.append_text("未知指令。用法：battle 怪物识别名\n")
+		output.append_text("用法：shop / gold 数量 / battle 怪物识别名 / treasure 0|1|2|3 / relic / add relic 遗物名称 / add card 卡牌名称\n")
 
 func _input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo and (event.keycode in [KEY_QUOTELEFT, KEY_ASCIITILDE] or event.physical_keycode == KEY_QUOTELEFT):

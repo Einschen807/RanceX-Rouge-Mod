@@ -2,7 +2,10 @@
 config_version=5
 
 [application]
-config/name="兰斯10 · 标题界面"
+config/name="Rance Slay The Spire"
+config/use_custom_user_dir=true
+config/custom_user_dir_name="Godot/app_userdata/兰斯10 · 标题界面"
+boot_splash/show_image=false
 run/main_scene="res://scenes/title_screen.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 
@@ -12,7 +15,11 @@ UIAudio="*res://scripts/ui_audio.gd"
 RunAutosave="*res://scripts/run_autosave.gd"
 Settings="*res://scripts/shared_settings.gd"
 BattleManager="*res://scripts/battle_manager.gd"
+ShopManager="*res://scripts/shop_manager.gd"
+RunSession="*res://scripts/run_session.gd"
 DebugConsole="*res://scripts/debug_console.gd"
+RelicHUD="*res://scripts/relic_hud.gd"
+ScreenSettings="*res://scripts/screen_settings.gd"
 ScreenTransition="*res://scripts/screen_transition.gd"
 
 [display]

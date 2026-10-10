@@ -30,7 +30,7 @@ func setup(record: Dictionary, state: TroopState, is_leader: bool, mode: int, sh
 	size = custom_minimum_size
 
 func _ready() -> void:
-	for style: String in ["normal", "hover", "pressed", "focus"]:
+	for style: String in ["normal", "hover", "pressed", "disabled", "focus"]:
 		add_theme_stylebox_override(style, StyleBoxEmpty.new())
 	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	visual = Control.new()

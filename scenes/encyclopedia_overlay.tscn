@@ -78,9 +78,9 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -690.0
+offset_left = -450.0
 offset_top = -280.0
-offset_right = 690.0
+offset_right = 450.0
 offset_bottom = 290.0
 theme_override_constants/separation = 60
 alignment = 1
@@ -89,7 +89,7 @@ mouse_filter = 2
 [node name="Cards" type="Button" parent="Foreground/Entries"]
 custom_minimum_size = Vector2(420, 570)
 layout_mode = 2
-focus_neighbor_left = NodePath("../Potions")
+focus_neighbor_left = NodePath("../Relics")
 focus_neighbor_right = NodePath("../Relics")
 focus_neighbor_bottom = NodePath("../../Back")
 script = ExtResource("3")
@@ -102,25 +102,13 @@ illustration = "cards"
 custom_minimum_size = Vector2(420, 570)
 layout_mode = 2
 focus_neighbor_left = NodePath("../Cards")
-focus_neighbor_right = NodePath("../Potions")
+focus_neighbor_right = NodePath("../Cards")
 focus_neighbor_bottom = NodePath("../../Back")
 script = ExtResource("3")
 entry_id = &"relics"
 title_text = "遗物收集"
 description_text = "检阅所有的遗物"
 illustration = "relics"
-
-[node name="Potions" type="Button" parent="Foreground/Entries"]
-custom_minimum_size = Vector2(420, 570)
-layout_mode = 2
-focus_neighbor_left = NodePath("../Relics")
-focus_neighbor_right = NodePath("../Cards")
-focus_neighbor_bottom = NodePath("../../Back")
-script = ExtResource("3")
-entry_id = &"potions"
-title_text = "药水研究所"
-description_text = "查看所有药水"
-illustration = "potions"
 
 [node name="Back" type="Button" parent="Foreground"]
 custom_minimum_size = Vector2(194, 90)
