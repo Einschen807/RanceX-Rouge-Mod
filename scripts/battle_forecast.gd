@@ -43,6 +43,7 @@ static func snapshot(source: BattleState) -> BattleState:
 	copy.support_groups = source.support_groups.duplicate(true)
 	copy.support_turns = source.support_turns.duplicate(true)
 	copy.shields = source.shields.duplicate(true)
+	copy.leader_powers = source.leader_powers.duplicate(true)
 	copy.shield_policy = source.shield_policy.duplicate(true)
 	copy.next_support_uid = source.next_support_uid
 	copy.pending_support_skills.assign(source.pending_support_skills.duplicate(true))

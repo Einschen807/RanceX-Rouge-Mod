@@ -17,6 +17,7 @@ var analysis_panel: Control
 var _analysis_button: OriginalUiButton
 var _previous_leaders: Array[String] = []
 var _cards: Control
+var _leader_power_layer: BattleLeaderPowerLayer
 var _ap: BattleApBar
 var _ap_override := -1
 var _ap_hover_key := ""
@@ -273,6 +274,9 @@ func _build() -> void:
 	_intents = _group("Intents")
 	_combo = _group("Combo")
 	_cards = _group("Leaders")
+	_leader_power_layer = BattleLeaderPowerLayer.new()
+	_leader_power_layer.name = "LeaderPowers"
+	add_child(_leader_power_layer)
 	_swap = BattleArt.button(self, "swap", Vector2(20, 752), Vector2(160, 105), _open_formation)
 	_swap_count = Control.new()
 	_swap_count.name = "SwapCooldown"
@@ -551,6 +555,8 @@ func _refresh_cards() -> void:
 		var slot := battle.troop.leaders.find(lifted_actor)
 		if slot >= 0:
 			BattleArt.picture(_cards, "card_frame", Vector2(198 + 218 * slot, 728))
+	_leader_power_layer.lifted = lifted_actor
+	_leader_power_layer.sync(battle, operation_mode, selected_card, animation_speed())
 
 func set_lifted_actor(actor: String) -> void:
 	lifted_actor = actor

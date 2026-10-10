@@ -4,12 +4,13 @@ class_name SkillBaseEffects
 ## Resolution returns commands to a future battle consumer, and never reads description text.
 
 static func has_effect(id: int) -> bool:
-	return id in range(0, 10) or id in range(30, 37) or id in [40, 41] or BattleStatusEffects.valid(id)
+	return id in range(0, 10) or id in range(30, 37) or id in range(40, 45) or BattleStatusEffects.valid(id)
 
 static func valid_value(id: int, value: int) -> bool:
 	if id in [3, 4]: return true
 	if id in range(6, 10): return true
 	if id == 5: return value in range(1, 8) or value in range(11, 18) or value in [21, 22]
+	if id in BattleLeaderPowers.NAMES: return BattleLeaderPowers.valid_selector(value)
 	if id == 33: return value in [1, 2, 3, 4, 5, 9]
 	if BattleStatusEffects.valid(id): return BattleStatusEffects.valid_value(value)
 	return value >= 0
@@ -53,6 +54,8 @@ static func resolve(skill: Dictionary, context: Dictionary) -> Array[Dictionary]
 			commands.append({"kind": "buff", "stat": "at", "amount": value})
 		elif effect in [40, 41]:
 			commands.append({"kind": "shield", "percent": value, "side": "player" if effect == 40 else "enemy"})
+		elif effect in BattleLeaderPowers.NAMES:
+			commands.append({"kind": "leader_power", "power": BattleLeaderPowers.NAMES[effect], "selector": value, "target": "self"})
 		elif BattleStatusEffects.valid(effect):
 			var command := BattleStatusEffects.command(effect, value)
 			if not command.is_empty(): commands.append(command)

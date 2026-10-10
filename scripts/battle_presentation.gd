@@ -112,6 +112,7 @@ func _card_lift(actor: String) -> CardWidget:
 	card.position = Vector2(200 + view.battle.troop.leaders.find(actor) * 218, 730)
 	card.pivot_offset = Vector2(104, 312)
 	layer.add_child(card)
+	view._leader_power_layer.lift(actor, card)
 	for decoration: String in ["LeaderBadge", "LeaderGlow"]:
 		if card.visual.has_node(decoration): card.visual.get_node(decoration).hide()
 	var lift := _tween().set_parallel(true)
@@ -120,6 +121,7 @@ func _card_lift(actor: String) -> CardWidget:
 	return card
 
 func _finish_card_lift(card: CardWidget) -> void:
+	view._leader_power_layer.return_to_slots()
 	# Hide before freeing: the restored slot and the animation must never share a frame.
 	if is_instance_valid(card):
 		card.hide()
