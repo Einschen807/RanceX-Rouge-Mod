@@ -1,11 +1,11 @@
 extends RefCounted
 class_name BattleSupports
 ## Data-driven support instances. No changes to formation base stats.
-const STRATEGIST := 40
-const BARRIER := 41
-const EXPLOSION := 42
-const ATTACK_SEAL := 43
-const DAMAGE_BLOCK := 44
+const STRATEGIST := "strategist"
+const BARRIER := "barrier"
+const EXPLOSION := "explosion"
+const ATTACK_SEAL := "attack_seal"
+const DAMAGE_BLOCK := "damage_block"
 
 static func group(state: BattleState, side: String) -> Array:
 	return state.support_groups[side]
@@ -13,12 +13,17 @@ static func group(state: BattleState, side: String) -> Array:
 static func definition(state: BattleState, entry: Dictionary) -> Dictionary:
 	return state.troop.catalog.supports.get(entry.id, {})
 
-static func effects(state: BattleState, side: String, effect: int) -> Array[Dictionary]:
+static func effects(state: BattleState, side: String, effect: Variant) -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	for entry: Dictionary in group(state, side):
 		var support := definition(state, entry)
 		var skill: Dictionary = state.troop.catalog.skills.get(support.get("skill", 0), {})
 		if int(skill.get("action", 0)) != 3: continue
+		if effect is String:
+			if int(skill.get("custom", 0)) != 1: continue
+			var rules := SkillCustomEffects.passive(int(skill.id))
+			if rules.has(effect): result.append({"entry": entry, "value": int(rules[effect])})
+			continue
 		for n: int in range(1, 4):
 			if int(skill.get("effect%d" % n, 0)) == effect:
 				result.append({"entry": entry, "value": int(skill["value%d" % n])})

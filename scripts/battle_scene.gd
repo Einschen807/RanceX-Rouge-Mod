@@ -41,6 +41,8 @@ var _enemy_hp_trail: TextureRect
 var _player_hp_trail: TextureRect
 var _enemy_hp_damage: BattleHpDamageEffect
 var _player_hp_damage: BattleHpDamageEffect
+var _enemy_shield: BattleShieldBar
+var _player_shield: BattleShieldBar
 var _enemy_number: BattleHpReadout
 var _player_number: BattleHpReadout
 var _round: OriginalBitmapNumber
@@ -66,18 +68,19 @@ func _process(delta: float) -> void:
 		if not _ap_hover_key.is_empty() or not _pending_damage_preview.is_empty() or _enemy_damage_preview.visible:
 			_clear_skill_preview()
 		return
-	if not _pending_damage_preview.is_empty() and not _enemy_hp_trail_animating():
+	if not _pending_damage_preview.is_empty() and not _enemy_hp_trail_animating() and not _enemy_shield.is_animating():
 		var request := _pending_damage_preview
 		_pending_damage_preview = {}
 		if battle.can_use(request.actor, request.id, request.slot):
 			_show_damage_preview(request.actor, request.id, request.slot)
 		else:
 			_clear_skill_preview()
-	if not _enemy_damage_preview.visible: return
+	if not _enemy_damage_preview.visible and not _enemy_shield.preview: return
 	_damage_preview_clock += delta
 	var alpha := 0.24 + 0.76 * (sin(_damage_preview_clock * TAU * 1.8) + 1.0) * 0.5
 	_enemy_damage_preview.modulate = Color(0.0, 0.0, 0.0, alpha)
 	_enemy_number.preview_alpha = alpha
+	if _enemy_shield.preview: _enemy_shield.set_preview(true, false, alpha)
 
 func _restore_skill_hover() -> void:
 	if not _pointer_known or not is_instance_valid(_cards) or input_locked or battle.phase != "player" or is_instance_valid(popup) or is_instance_valid(formation) or get_tree().get_first_node_in_group("modal_overlay") != null or get_node("/root/ScreenTransition").busy: return
@@ -241,6 +244,8 @@ func _build() -> void:
 	_player_hp_damage = BattleHpDamageEffect.new()
 	_player_hp_damage.name = "PlayerHpDamage"
 	add_child(_player_hp_damage)
+	_enemy_shield = _shield_bar("EnemyShield", Vector2(29, 597), false)
+	_player_shield = _shield_bar("PlayerShield", Vector2(1050, 597), true)
 	var round_ground := OriginalFlatPlayer.new()
 	round_ground.hidden_libraries = ["ＡＰ下地.png"]
 	round_ground.animation_path = "res://assets/battle/native/ap_ground/animation.json"
@@ -310,6 +315,16 @@ func _hp_fill(asset: String, at: Vector2, reverse: bool) -> TextureRect:
 	fill.set_meta("reverse", reverse)
 	fill.set_meta("origin", at)
 	return fill
+
+func _shield_bar(node_name: String, at: Vector2, reverse: bool) -> BattleShieldBar:
+	var bar := BattleShieldBar.new()
+	bar.name = node_name
+	bar.position = at
+	bar.reverse = reverse
+	bar.view = self
+	add_child(bar)
+	battle.shield_event.connect(bar.on_shield_event)
+	return bar
 
 func _hp_trail(asset: String, at: Vector2, reverse: bool) -> TextureRect:
 	var trail := _hp_fill(asset, at, reverse)
@@ -400,6 +415,8 @@ func _refresh() -> void:
 	_player_number.ratio_text = "(%d%%)" % roundi(battle.player_hp / maxf(1, battle.player_max_hp) * 100)
 	_set_hp_with_trail(_enemy_fill, _enemy_hp_trail, battle.enemy_hp, battle.enemy_max_hp)
 	_set_hp_with_trail(_player_fill, _player_hp_trail, battle.player_hp, battle.player_max_hp)
+	_enemy_shield.sync(BattleShields.percent(battle, "enemy"))
+	_player_shield.sync(BattleShields.percent(battle, "player"))
 	for bar: BattleStatusBar in _status_bars: bar.sync()
 	for bar: BattleSupportBar in _support_bars: bar.sync()
 	_refresh_hp_visibility()
@@ -552,7 +569,7 @@ func _preview_skill_ap(actor: String, id: int, slot: int, entered: bool) -> void
 	if input_locked or is_instance_valid(popup) or is_instance_valid(formation) or get_tree().get_first_node_in_group("modal_overlay") != null or get_node("/root/ScreenTransition").busy or not battle.can_use(actor, id, slot): return
 	_ap_hover_key = key
 	_ap.set_preview(battle.runtime.ap_cost(actor, battle.troop.catalog.skills[id], slot))
-	if _enemy_hp_trail_animating():
+	if _enemy_hp_trail_animating() or _enemy_shield.is_animating():
 		_pending_damage_preview = {"actor": actor, "id": id, "slot": slot}
 		return
 	_show_damage_preview(actor, id, slot)
@@ -565,7 +582,14 @@ func _show_damage_preview(actor: String, id: int, slot: int) -> void:
 	if battle.information_hidden("enemy"): return
 	# Calculate from live HP only after the delayed gauge has completely settled.
 	var forecast := BattleForecast.action(battle, actor, id, false, slot)
-	if not forecast.ok or forecast.hp_loss <= 0.0: return
+	if not forecast.ok: return
+	_damage_preview_clock = 0.0
+	if forecast.shield_loss > 0.0:
+		if forecast.remaining_shield > 0.0:
+			_enemy_shield.set_preview(true)
+			return
+		_enemy_shield.set_preview(false, true)
+	if forecast.hp_loss <= 0.0: return
 	var maximum := maxf(1.0, battle.enemy_max_hp)
 	var after := clampf(float(forecast.remaining_hp) / maximum, 0.0, 1.0)
 	_enemy_damage_preview.set_meta("remaining_ratio", after)
@@ -590,6 +614,9 @@ func _clear_skill_preview() -> void:
 	_pending_damage_preview = {}
 	if is_instance_valid(_ap): _ap.set_preview(0)
 	if is_instance_valid(_enemy_damage_preview): _enemy_damage_preview.hide()
+	if is_instance_valid(_enemy_shield):
+		_enemy_shield.set_preview(false)
+		_enemy_shield.set_information_hidden(battle.information_hidden("enemy"))
 	if is_instance_valid(_enemy_number):
 		_enemy_number.preview_ratio = ""
 		_enemy_number.preview_alpha = 1.0
@@ -849,6 +876,8 @@ func _refresh_hp_visibility() -> void:
 		fill.visible = not hidden and (battle.enemy_hp if side == "enemy" else battle.player_hp) > 0.0
 		trail.visible = not hidden and float(trail.get_meta("hp_ratio", 0.0)) > 0.0
 		if hidden: effect.hide()
+		var shield := _enemy_shield if side == "enemy" else _player_shield
+		shield.set_information_hidden(hidden)
 		_hidden_hp_labels[side].visible = hidden
 
 func _show_status_detail(side: String, id: int) -> void:

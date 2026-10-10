@@ -14,6 +14,8 @@ static func capture(state: BattleState) -> Dictionary:
 			for id: int in value: statuses.append({"id": id, "turns": value[id]})
 			fields[field] = statuses
 		else: fields[field] = value.duplicate(true) if value is Array or value is Dictionary else value
+	fields.shields = state.shields.duplicate(true)
+	fields.shield_policy = state.shield_policy.duplicate(true)
 	return {"version": VERSION, "troop": TroopCheckpoint.capture(state.troop), "monster": state.monster.duplicate(true), "enemy_runtime": TroopCheckpoint.capture_runtime(state.enemy_runtime), "fields": fields}
 
 static func restore(source: BattleState, data: Dictionary) -> BattleState:
@@ -43,6 +45,8 @@ static func restore(source: BattleState, data: Dictionary) -> BattleState:
 		elif result.get(field) is Array: result.get(field).assign(value)
 		else: result.set(field, value.duplicate(true) if value is Dictionary else value)
 	result.preparation_checkpoint = data.duplicate(true)
+	if data.fields.get("shields") is Dictionary: result.shields = data.fields.shields.duplicate(true)
+	if data.fields.get("shield_policy") is Dictionary: result.shield_policy = data.fields.shield_policy.duplicate(true)
 	result.animate_automatic_skills = source.animate_automatic_skills
 	result.entry_missing_hp = source.entry_missing_hp
 	result.troop.changed.emit()

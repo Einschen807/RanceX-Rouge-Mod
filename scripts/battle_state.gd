@@ -5,10 +5,13 @@ signal changed
 signal log_added(message: String)
 signal status_event(side: String, id: int, event: String)
 signal support_event(side: String, uid: int, event: String)
+signal shield_event(side: String, event: String)
 signal relic_triggered(display_name: String)
 var pending_relic_feedback: Array[Dictionary] = []
 var support_groups := {"player": [], "enemy": []}
 var support_turns := {"player": 0, "enemy": 0}
+var shields := {"player": [], "enemy": []}
+var shield_policy := {"player": {"duration_turns": 1, "decay_percent": -1.0, "prevent_decay": false}, "enemy": {"duration_turns": 1, "decay_percent": -1.0, "prevent_decay": false}}
 var next_support_uid := 1
 var pending_support_skills: Array[Dictionary] = []
 var pending_support_feedback: Array[Dictionary] = []
@@ -66,6 +69,8 @@ func configure(state: TroopState, monsters: MonsterCatalog, identity: String) ->
 	enemy_runtime.begin_battle()
 	support_groups = {"player": [], "enemy": []}
 	support_turns = {"player": 0, "enemy": 0}
+	shields = {"player": [], "enemy": []}
+	shield_policy = {"player": {"duration_turns": 1, "decay_percent": -1.0, "prevent_decay": false}, "enemy": {"duration_turns": 1, "decay_percent": -1.0, "prevent_decay": false}}
 	next_support_uid = 1
 	pending_support_skills.clear()
 	pending_support_feedback.clear()
@@ -107,6 +112,7 @@ func can_swap() -> bool:
 
 func sync_formation(previous_leaders: Array[String] = []) -> void:
 	player_max_hp = troop.total("hp")
+	BattleShields.clamp_capacity(self, "player")
 	player_hp = (maxf(0.0, player_max_hp - entry_missing_hp) if entry_missing_hp >= 0.0 else player_max_hp) if phase == "preparation" else minf(player_hp, player_max_hp)
 	ap = mini(ap, ap_max())
 	if phase != "preparation":
@@ -183,6 +189,7 @@ func begin_enemy_turn() -> bool:
 	enemy_actions_done = 0
 	pending_enemy_skill = 0
 	pending_enemy_commands.clear()
+	BattleShields.begin_turn(self, "enemy")
 	_start_status_turn("enemy")
 	if phase != "result": BattleSupports.begin_turn(self, "enemy")
 	changed.emit()
@@ -268,6 +275,7 @@ func _turn_start() -> void:
 	pending_automatic_skills.clear()
 	log_message("Round %d" % round)
 	_replace_down_leaders()
+	BattleShields.begin_turn(self, "player")
 	_choose_intent()
 	_start_status_turn("player")
 	if phase != "result": BattleSupports.begin_turn(self, "player")
@@ -358,6 +366,7 @@ func _apply(side: String, skill: Dictionary, commands: Array) -> void:
 					continue
 				var amount := float(damage_breakdown(side, skill, command).unblocked_damage)
 				if BattleSupports.absorb(self, target_side, command, amount): continue
+				amount = BattleShields.absorb(self, target_side, amount)
 				if player_target:
 					player_hp = maxf(0.0, player_hp - amount)
 				else:
@@ -391,6 +400,8 @@ func _apply(side: String, skill: Dictionary, commands: Array) -> void:
 				BattleSupports.add(self, target_side, int(command.support), String(command.get("actor", "")))
 			"support_remove":
 				BattleSupports.dispel(self, target_side, command)
+			"shield":
+				BattleShields.add(self, String(command.side), float(command.percent), command.get("options", {}))
 			"buff":
 				if command.get("stat", "at") == "at":
 					if player_target:
@@ -410,6 +421,7 @@ func lose_hp(side: String, percent: float, command: Dictionary = {}) -> float:
 	var maximum := player_max_hp if side == "player" else enemy_max_hp
 	var amount := minf(hp, maxf(0.0, maximum * percent / 100.0))
 	if BattleSupports.absorb(self, side, command, amount): return 0.0
+	amount = BattleShields.absorb(self, side, amount)
 	if side == "player":
 		player_hp -= amount
 		player_damage_total += amount
@@ -545,6 +557,7 @@ func _status_damage(side: String, id: int, ratio: float) -> void:
 	var hp := player_hp if side == "player" else enemy_hp
 	var amount := maxf(0.0, floor(minf(hp - 1.0, hp * ratio)))
 	if BattleSupports.absorb(self, side, {}, amount): amount = 0.0
+	amount = BattleShields.absorb(self, side, amount)
 	if amount > 0.0:
 		if side == "player":
 			player_hp -= amount
@@ -608,6 +621,7 @@ func log_message(message: String) -> void:
 	log_added.emit(message)
 
 func finish() -> void:
+	shields = {"player": [], "enemy": []}
 	troop.battle_active = false
 	troop.bonus_edit_locked = false
 	pending_down_replacements.clear()

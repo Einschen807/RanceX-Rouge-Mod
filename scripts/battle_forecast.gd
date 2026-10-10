@@ -42,6 +42,8 @@ static func snapshot(source: BattleState) -> BattleState:
 	copy.combat_damage_rates = source.combat_damage_rates.duplicate(true)
 	copy.support_groups = source.support_groups.duplicate(true)
 	copy.support_turns = source.support_turns.duplicate(true)
+	copy.shields = source.shields.duplicate(true)
+	copy.shield_policy = source.shield_policy.duplicate(true)
 	copy.next_support_uid = source.next_support_uid
 	copy.pending_support_skills.assign(source.pending_support_skills.duplicate(true))
 	copy.enemy_down = source.enemy_down
@@ -62,7 +64,9 @@ static func _damage(state: BattleState, side: String, skill: Dictionary, command
 static func action(state: BattleState, actor: String, id: int, enemy := false, slot := -1, prepared: Dictionary = {}) -> Dictionary:
 	var before := state.player_hp if enemy else state.enemy_hp
 	var maximum := state.player_max_hp if enemy else state.enemy_max_hp
-	var forecast := {"ok": false, "damage": 0.0, "hp_loss": 0.0, "remaining_hp": before, "maximum_hp": maximum, "lethal": false}
+	var target_side := "player" if enemy else "enemy"
+	var shield_before := BattleShields.amount(state, target_side)
+	var forecast := {"ok": false, "damage": 0.0, "hp_loss": 0.0, "remaining_hp": before, "maximum_hp": maximum, "lethal": false, "remaining_shield": shield_before, "shield_loss": 0.0}
 	if not state.troop.catalog.skills.has(id): return forecast
 	var copy := snapshot(state)
 	var result: Dictionary
@@ -76,6 +80,8 @@ static func action(state: BattleState, actor: String, id: int, enemy := false, s
 	forecast.damage = (copy.player_damage_total - state.player_damage_total) if enemy else (copy.enemy_damage_total - state.enemy_damage_total)
 	forecast.remaining_hp = copy.player_hp if enemy else copy.enemy_hp
 	forecast.hp_loss = maxf(0.0, before - float(forecast.remaining_hp))
+	forecast.remaining_shield = BattleShields.amount(copy, target_side)
+	forecast.shield_loss = maxf(0.0, shield_before - float(forecast.remaining_shield))
 	forecast.lethal = before > 0.0 and forecast.damage > 0.0 and forecast.remaining_hp <= 0.0
 	return forecast
 
