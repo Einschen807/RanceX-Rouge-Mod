@@ -1,0 +1,154 @@
+extends CanvasLayer
+var panel: Control
+var entry: LineEdit
+var output: RichTextLabel
+var history: Array[String] = []
+var history_index := 0
+const HELP_TEXT := """可用命令：
+help — 显示全部命令
+shop — 打开商店
+gold 数量 — 添加贝壳（正整数）
+heal 百分比 — 恢复部队最大HP的1～100%
+battle 怪物识别名 — 进入指定战斗
+event 事件名 — 强制进入指定事件，无视出现条件与地图层数
+treasure 0|1|2|3 — 打开对应类型的卡牌宝箱
+relic [遗物池名称] — 打开遗物宝箱，省略池名使用默认遗物池
+add relic 遗物名称 — 获得指定遗物
+delet relic 遗物名称 — 删除持有遗物（也支持 delete relic）
+add card 卡牌名称 — 获得卡牌，已有卡牌增加一颗强化星
+add medal 数量 — 添加勋章（正整数）
+"""
+
+func _ready() -> void:
+	layer = 110
+	panel = Control.new()
+	panel.size = Vector2(1920, 330)
+	add_child(panel)
+	var frame := Panel.new()
+	frame.size = panel.size
+	frame.add_theme_stylebox_override("panel", BattleArt.panel_style())
+	panel.add_child(frame)
+	BattleArt.label(frame, "控制台", Vector2(24, 10), Vector2(1850, 40), 25, FormationArt.GOLD)
+	output = RichTextLabel.new()
+	output.position = Vector2(24, 58)
+	output.size = Vector2(1872, 190)
+	output.add_theme_font_override("normal_font", CardWidget.CARD_TEXT_FONT)
+	output.add_theme_font_size_override("normal_font_size", 22)
+	output.scroll_following = true
+	frame.add_child(output)
+	entry = LineEdit.new()
+	entry.position = Vector2(24, 262)
+	entry.size = Vector2(1872, 48)
+	entry.add_theme_font_override("font", CardWidget.CARD_TEXT_FONT)
+	entry.add_theme_font_size_override("font_size", 25)
+	entry.text_submitted.connect(execute)
+	frame.add_child(entry)
+	panel.hide()
+
+func toggle() -> void:
+	if panel.visible:
+		close()
+	else:
+		panel.show()
+		panel.add_to_group("modal_overlay")
+		entry.grab_focus()
+
+func close() -> void:
+	panel.hide()
+	panel.remove_from_group("modal_overlay")
+	entry.release_focus()
+
+func execute(command: String) -> void:
+	command = command.strip_edges()
+	if command.is_empty(): return
+	history.append(command)
+	history_index = history.size()
+	output.append_text("> " + command + "\n")
+	entry.clear()
+	var result := run_command(command)
+	output.append_text(result.message + "\n")
+	if result.ok and command.to_lower() != "help": close()
+
+## Shared command dispatcher: event options do not manipulate the console UI.
+func run_command(command: String, context: Node = null) -> Dictionary:
+	command = command.strip_edges()
+	if command.is_empty(): return {"ok": true, "message": "你继续踏上了旅途。"}
+	var split := command.split(" ", false, 1)
+	var verb := split[0].to_lower()
+	var argument := split[1].strip_edges() if split.size() == 2 else ""
+	var message := ""
+	var ok := false
+	match verb:
+		"help":
+			message = HELP_TEXT
+			ok = true
+		"shop":
+			message = get_node("/root/ShopManager").launch()
+			ok = message.begins_with("进入商店")
+		"battle":
+			message = get_node("/root/BattleManager").launch(argument)
+			ok = message.begins_with("进入战斗")
+		"event":
+			message = get_node("/root/EventManager").launch(argument)
+			ok = message.begins_with("进入事件")
+		"treasure":
+			message = get_node("/root/BattleManager").launch_treasure(int(argument)) if argument in ["0", "1", "2", "3"] else "用法：treasure 0|1|2|3"
+			ok = message.begins_with("打开宝箱")
+		"relic":
+			message = get_node("/root/BattleManager").launch_relic(argument if not argument.is_empty() else "默认遗物池")
+			ok = message.begins_with("打开遗物宝箱")
+		"heal":
+			var session: Node = context if context != null else get_node("/root/EventManager").current_session()
+			if session.active and argument.is_valid_int() and int(argument) > 0 and int(argument) <= 100:
+				session.heal(int(argument))
+				message = "恢复%d%%最大生命。" % int(argument)
+				ok = true
+			else: message = "用法：heal 1～100（恢复最大HP百分比，需在行军中）"
+		"gold":
+			var source: TroopState = get_node("/root/BattleManager").current_troop()
+			var amount := int(argument) if argument.is_valid_int() else 0
+			if source == null: message = "数据加载失败。"
+			elif amount <= 0 or amount > 9223372036854775807 - source.gold: message = "用法：gold 正整数数量"
+			else:
+				source.add_gold(amount)
+				message = "获得贝壳：%d" % amount
+				ok = true
+		"add":
+			var args := argument.split(" ", false, 1)
+			if args.size() == 2 and args[0].to_lower() == "medal":
+				var amount := int(args[1]) if args[1].is_valid_int() else 0
+				var source: TroopState = get_node("/root/BattleManager").current_troop()
+				if source == null: message = "数据加载失败。"
+				elif amount <= 0 or amount > 9223372036854775807 - maxi(source.medals, source.medal_progress): message = "用法：add medal 正整数数量"
+				else:
+					source.add_medals(amount)
+					message = "获得勋章：%d" % amount
+					ok = true
+			elif args.size() == 2 and args[0].to_lower() in ["relic", "card"]:
+				message = get_node("/root/BattleManager").grant(args[0].to_lower(), args[1].strip_edges())
+				ok = message.begins_with("获得")
+			else: message = "用法：add relic 遗物名称 / add card 卡牌名称 / add medal 正整数数量"
+		"delet", "delete":
+			var args := argument.split(" ", false, 1)
+			var source: TroopState = get_node("/root/BattleManager").current_troop()
+			if source != null and args.size() == 2 and args[0].to_lower() == "relic":
+				ok = source.remove_relic(args[1].strip_edges())
+				message = ("删除遗物：" if ok else "未持有遗物：") + args[1].strip_edges()
+			else: message = "用法：delet relic 遗物名称"
+		_:
+			message = "未知命令或参数不完整，输入 help 查看全部命令。"
+	return {"ok": ok, "message": message}
+
+func _input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo and (event.keycode in [KEY_QUOTELEFT, KEY_ASCIITILDE] or event.physical_keycode == KEY_QUOTELEFT):
+		get_viewport().set_input_as_handled()
+		toggle()
+	elif panel.visible:
+		if event.is_action_pressed("ui_cancel"):
+			get_viewport().set_input_as_handled()
+			close()
+		elif event is InputEventKey and event.pressed and event.keycode in [KEY_UP, KEY_DOWN]:
+			get_viewport().set_input_as_handled()
+			history_index = clampi(history_index + (-1 if event.keycode == KEY_UP else 1), 0, history.size())
+			entry.text = history[history_index] if history_index < history.size() else ""
+			entry.caret_column = entry.text.length()

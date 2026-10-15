@@ -1,6 +1,6 @@
 [gd_scene load_steps=6 format=3]
 
-[ext_resource type="Script" path="res://scripts/cut_in_card_burst.gd" id="1_script"]
+[ext_resource type="Script" path="res://scripts/skill/cut_in_card_burst.gd" id="1_script"]
 [ext_resource type="AudioStream" path="res://assets/cut_ins/卡牌破界.wav" id="2_split"]
 
 [sub_resource type="Animation" id="Animation_cut_in"]

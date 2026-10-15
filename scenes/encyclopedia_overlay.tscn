@@ -1,9 +1,9 @@
 [gd_scene load_steps=7 format=3]
 
-[ext_resource type="Script" path="res://scripts/encyclopedia_overlay.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/encyclopedia/encyclopedia_overlay.gd" id="1"]
 [ext_resource type="Shader" path="res://shaders/gaussian_blur.gdshader" id="2"]
-[ext_resource type="Script" path="res://scripts/encyclopedia_entry.gd" id="3"]
-[ext_resource type="Script" path="res://scripts/title_button.gd" id="4"]
+[ext_resource type="Script" path="res://scripts/encyclopedia/encyclopedia_entry.gd" id="3"]
+[ext_resource type="Script" path="res://scripts/title/title_button.gd" id="4"]
 
 [sub_resource type="ShaderMaterial" id="Horizontal"]
 shader = ExtResource("2")

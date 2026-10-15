@@ -1,9 +1,9 @@
 [gd_scene load_steps=9 format=3]
 
-[ext_resource type="Script" path="res://scripts/title_screen.gd" id="1_title"]
-[ext_resource type="Script" path="res://scripts/original_flat_player.gd" id="2_flat"]
-[ext_resource type="Script" path="res://scripts/title_button.gd" id="3_button"]
-[ext_resource type="Script" path="res://scripts/title_audio.gd" id="4_audio"]
+[ext_resource type="Script" path="res://scripts/title/title_screen.gd" id="1_title"]
+[ext_resource type="Script" path="res://scripts/animation/original_flat_player.gd" id="2_flat"]
+[ext_resource type="Script" path="res://scripts/title/title_button.gd" id="3_button"]
+[ext_resource type="Script" path="res://scripts/title/title_audio.gd" id="4_audio"]
 [ext_resource type="PackedScene" path="res://scenes/encyclopedia_overlay.tscn" id="5_encyclopedia"]
 
 [sub_resource type="SystemFont" id="SystemFont_chinese"]
