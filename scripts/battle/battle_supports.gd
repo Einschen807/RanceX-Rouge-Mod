@@ -68,6 +68,8 @@ static func add(state: BattleState, side: String, id: int, actor := "") -> bool:
 		list[found] = entry
 	else:
 		list.append(entry)
+	if side == "player" and (found < 0 or int(support.repeat) == 3):
+		BattleShields.add(state, "player", float(state.ability_rules.support_shield))
 	BattleDoushinTargets.added(state, side, id)
 	state.support_event.emit(side, entry.uid, "added")
 	state.log_message("%s配置%s" % ["联合部队" if side == "player" else state.monster.name, support.name])
@@ -132,6 +134,7 @@ static func prepare(state: BattleState, side: String, uid: int) -> Dictionary:
 		ctx.actor = support.name
 		ctx.actor_identity = ""
 		ctx.actor_slot = -1
+		ctx.element = 0
 		ctx.support_source = true
 		ctx.ignore_ap = true
 		ctx.allow_multiple_actions = true

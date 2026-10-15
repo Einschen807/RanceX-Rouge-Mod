@@ -162,22 +162,28 @@ func _build_card() -> void:
 	_card_snapshot.gui_disable_input = true
 	_card_snapshot.render_target_update_mode = SubViewport.UPDATE_ONCE
 	add_child(_card_snapshot)
-	var card := CardWidget.new()
 	if is_instance_valid(_source):
+		var card := CardWidget.new()
 		card.setup(_source.card, _source.troop, false, _source.detail_mode, _source.preview_upgrades)
 		card.portrait_only = _source.portrait_only
 		card.skill_costs = _source.skill_costs.duplicate()
+		card.scale = Vector2.ONE * 2.0
+		card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_card_snapshot.add_child(card)
+		for decoration: String in ["LeaderBadge", "LeaderGlow"]:
+			if card.visual.has_node(decoration): card.visual.get_node(decoration).hide()
 	else:
-		var catalog := CardCatalog.new()
-		catalog.load_catalog()
-		var troop := TroopState.new()
-		troop.configure(catalog, true)
-		card.setup(catalog.find_name("Lv43 上杉谦信"), troop, false, 0)
-	card.scale = Vector2.ONE * 2.0
-	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_card_snapshot.add_child(card)
-	for decoration: String in ["LeaderBadge", "LeaderGlow"]:
-		if card.visual.has_node(decoration): card.visual.get_node(decoration).hide()
+		# Standalone art previews do not require an entry in the playable card roster.
+		var preview := Control.new()
+		preview.scale = Vector2.ONE * 2.0
+		_card_snapshot.add_child(preview)
+		FormationArt.picture(preview, "back_6", Vector2.ZERO, Vector2(208, 312))
+		var portrait := TextureRect.new()
+		portrait.texture = load("res://assets/cards/谦信／基本.png")
+		portrait.size = Vector2(208, 312)
+		portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		preview.add_child(portrait)
+		FormationArt.picture(preview, "frame_6", Vector2.ZERO, Vector2(208, 312))
 	_moving_card = TextureRect.new()
 	_moving_card.name = "CardIntoGlass"
 	_moving_card.texture = _card_snapshot.get_texture()

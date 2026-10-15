@@ -5,6 +5,8 @@ class_name CutInCardBurst
 @export var voice: AudioStream
 @export var accent := Color("66b8ff")
 @export var actor_name := ""
+@export var preview_card_face: Texture2D
+@export_range(1, 10) var preview_card_faction := 1
 @export var portrait_black_matte := false
 @export var portrait_position := Vector2(267, 7)
 @export var portrait_width := 1270.0
@@ -68,8 +70,9 @@ func _build_card() -> void:
 	_snapshot.gui_disable_input = true
 	_snapshot.render_target_update_mode = SubViewport.UPDATE_ONCE
 	add_child(_snapshot)
-	var card := CardWidget.new()
+	var card: CardWidget
 	if is_instance_valid(_source):
+		card = CardWidget.new()
 		card.setup(_source.card, _source.troop, false, _source.detail_mode, _source.preview_upgrades)
 		card.portrait_only = _source.portrait_only
 		card.skill_costs = _source.skill_costs.duplicate()
@@ -79,13 +82,30 @@ func _build_card() -> void:
 		catalog.load_catalog()
 		var troop := TroopState.new()
 		troop.configure(catalog, true)
-		card.setup(catalog.find_name(actor_name), troop, false, 0)
-	card.scale = Vector2.ONE * 2.0
-	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	card.focus_mode = Control.FOCUS_NONE
-	_snapshot.add_child(card)
-	for decoration: String in ["LeaderBadge", "LeaderGlow"]:
-		if card.visual.has_node(decoration): card.visual.get_node(decoration).hide()
+		var record := catalog.find_name(actor_name)
+		if not record.is_empty():
+			card = CardWidget.new()
+			card.setup(record, troop, false, 0)
+		else:
+			# Removed playable cards can still have independent cinematic art previews.
+			var preview := Control.new()
+			preview.scale = Vector2.ONE * 2.0
+			_snapshot.add_child(preview)
+			FormationArt.picture(preview, "back_%d" % preview_card_faction, Vector2.ZERO, Vector2(208, 312))
+			var face := TextureRect.new()
+			face.texture = preview_card_face if preview_card_face != null else portrait
+			face.size = Vector2(208, 312)
+			face.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			face.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			preview.add_child(face)
+			FormationArt.picture(preview, "frame_%d" % preview_card_faction, Vector2.ZERO, Vector2(208, 312))
+	if card != null:
+		card.scale = Vector2.ONE * 2.0
+		card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		card.focus_mode = Control.FOCUS_NONE
+		_snapshot.add_child(card)
+		for decoration: String in ["LeaderBadge", "LeaderGlow"]:
+			if card.visual.has_node(decoration): card.visual.get_node(decoration).hide()
 	for side: float in [-1.0, 1.0]:
 		var half := TextureRect.new()
 		half.texture = _snapshot.get_texture()

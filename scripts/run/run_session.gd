@@ -3,6 +3,7 @@ extends Node
 signal changed
 signal troop_leveled_up(count: int)
 signal title_requested
+signal travel_mode_changed
 var catalog: CardCatalog
 var monsters: MonsterCatalog
 var pools: RunPoolCatalog
@@ -12,8 +13,8 @@ var act := 0
 var seed_value := 0
 var current := ""
 var last_room_type := ""
-var visited: Array = [[], [], []]
-var normal_battles: Array = [0, 0, 0]
+var visited: Array = [[], [], [], []]
+var normal_battles: Array = [0, 0, 0, 0]
 var beaten: Dictionary = {}
 var seen_events: Dictionary = {}
 var missing_hp := 0.0
@@ -22,6 +23,8 @@ var pending: Dictionary = {}
 var ended := false
 var active := false
 var error := ""
+## Console-only switch for this application session; never included in checkpoints.
+var travel_enabled := false
 
 func _load_catalogs() -> bool:
 	error = ""
@@ -80,11 +83,8 @@ func begin(seed_override := -1) -> bool:
 	if not _load_data(): return false
 	seed_value = seed_override if seed_override >= 0 else int(Time.get_unix_time_from_system() * 1000.0) % 2147483647
 	maps.clear()
-	for layer: int in range(3):
+	for layer: int in range(MapThemeCatalog.THEMES.size()):
 		var map := ActMapGenerator.generate(seed_value, layer)
-		var theme_rng := RandomNumberGenerator.new()
-		theme_rng.seed = seed_value + 7919 * (layer + 1)
-		map["theme"] = RunPoolCatalog.MAP_THEMES[layer][theme_rng.randi_range(0, RunPoolCatalog.MAP_THEMES[layer].size() - 1)]
 		var invalid := ActMapGenerator.validate(map)
 		if not invalid.is_empty():
 			error = invalid
@@ -93,8 +93,8 @@ func begin(seed_override := -1) -> bool:
 	act = 0
 	current = ""
 	last_room_type = ""
-	visited = [[], [], []]
-	normal_battles = [0, 0, 0]
+	visited = [[], [], [], []]
+	normal_battles = [0, 0, 0, 0]
 	beaten.clear()
 	seen_events.clear()
 	missing_hp = 0.0
@@ -116,7 +116,7 @@ func resume() -> bool:
 		return false
 	var progress: Dictionary = entry.progress
 	if not _valid_progress(progress):
-		error = "存档没有可恢复的三层地图，或地图数据已损坏。"
+		error = "存档没有可恢复的楼层地图，或地图数据已损坏。"
 		autosave.finish_node()
 		return false
 	maps = progress.maps.duplicate(true)
@@ -126,6 +126,16 @@ func resume() -> bool:
 	last_room_type = progress.get("last_room_type", "")
 	visited = progress.visited.duplicate(true)
 	normal_battles = progress.normal_battles.duplicate()
+	# Preserve old layouts/themes; only append the newly available fourth floor.
+	for layer: int in range(maps.size()):
+		if not maps[layer].has("theme") and layer <= act:
+			maps[layer]["theme"] = MapThemeCatalog.THEMES[layer][0]
+		if not maps[layer].has("intro_seen") and layer <= act:
+			maps[layer]["intro_seen"] = true
+	while maps.size() < MapThemeCatalog.THEMES.size():
+		maps.append(ActMapGenerator.generate(seed_value, maps.size()))
+		visited.append([])
+		normal_battles.append(0)
 	beaten = progress.beaten.duplicate()
 	seen_events = progress.seen_events.duplicate()
 	missing_hp = float(progress.missing_hp)
@@ -146,13 +156,14 @@ func resume() -> bool:
 	return true
 
 func _valid_progress(data: Dictionary) -> bool:
-	if data.get("map_version", 0) != 1 or not data.get("maps") is Array or data.maps.size() != 3 or not RecordTable.integer(data.get("act")) or data.act < 0 or data.act > 2: return false
+	if data.get("map_version", 0) != 1 or not data.get("maps") is Array or data.maps.size() not in [3, 4] or not RecordTable.integer(data.get("act")) or data.act < 0 or data.act >= data.maps.size(): return false
 	if not data.get("seed") is String or not data.seed.is_valid_int() or not data.get("ended") is bool: return false
-	if not data.get("current") is String or not data.get("visited") is Array or data.visited.size() != 3 or not data.get("normal_battles") is Array or data.normal_battles.size() != 3: return false
+	if not data.get("current") is String or not data.get("visited") is Array or data.visited.size() != data.maps.size() or not data.get("normal_battles") is Array or data.normal_battles.size() != data.maps.size(): return false
 	if not data.get("beaten") is Dictionary or not data.get("seen_events") is Dictionary or not TroopCheckpoint._number(data.get("missing_hp")) or data.missing_hp < 0 or not data.get("unknown_odds") is Dictionary: return false
-	for i: int in range(3):
+	for i: int in range(data.maps.size()):
 		if not data.maps[i] is Dictionary or not ActMapGenerator.validate(data.maps[i]).is_empty() or not data.visited[i] is Array or not RecordTable.integer(data.normal_battles[i]) or data.normal_battles[i] < 0: return false
 		if data.maps[i].has("theme") and data.maps[i].theme not in RunPoolCatalog.MAP_THEMES[i]: return false
+		if data.maps[i].has("intro_seen") and not data.maps[i].intro_seen is bool: return false
 		for id: Variant in data.visited[i]:
 			if not id is String or not data.maps[i].nodes.has(id): return false
 	if not data.current.is_empty() and not data.maps[int(data.act)].nodes.has(data.current): return false
@@ -180,6 +191,14 @@ func map_theme() -> String:
 
 func event_pool() -> String:
 	return RunPoolCatalog.MONSTER_LAYERS[act] + map_theme()
+
+func mark_map_intro_seen() -> Error:
+	if graph().get("intro_seen", false): return OK
+	var autosave := get_node("/root/RunAutosave")
+	var result: Error = autosave.mark_map_intro_seen(act, catalog)
+	if result == OK: graph()["intro_seen"] = true
+	else: error = autosave.last_error
+	return result
 
 func current_event() -> Dictionary:
 	if pending.get("type") != "unknown" or pending.get("event", "").is_empty(): return {}
@@ -217,7 +236,13 @@ func hp() -> float:
 
 func available_nodes() -> Array:
 	if ended or not pending.is_empty(): return []
+	if travel_enabled: return graph().nodes.keys()
 	return ["start"] if current.is_empty() else graph().nodes[current].children.duplicate()
+
+func toggle_travel() -> bool:
+	travel_enabled = not travel_enabled
+	travel_mode_changed.emit()
+	return travel_enabled
 
 func snapshot() -> Dictionary:
 	return {"map_version": 1, "maps": maps.duplicate(true), "act": act, "seed": str(seed_value), "current": current, "last_room_type": last_room_type, "visited": visited.duplicate(true), "normal_battles": normal_battles.duplicate(), "beaten": beaten.duplicate(), "seen_events": seen_events.duplicate(), "missing_hp": missing_hp, "unknown_odds": unknown_odds.duplicate(), "ended": ended}
@@ -235,6 +260,11 @@ func enter(id: String) -> bool:
 	var previous_odds := unknown_odds.duplicate()
 	var previous_seen := seen_events.duplicate()
 	var type: String = graph().nodes[id].type
+	if type == "ancient" and not graph().has("theme"):
+		var theme_rng := RandomNumberGenerator.new()
+		theme_rng.seed = seed_value + 7919 * (act + 1)
+		graph()["theme"] = pools.themes.choose(act, theme_rng)
+		graph()["intro_seen"] = false
 	var original_type := type
 	if type == "unknown": type = _roll_unknown(id)
 	pending = {"id": id, "type": type, "original_type": original_type}
@@ -295,7 +325,7 @@ func complete_node() -> void:
 	pending.clear()
 	get_node("/root/RunAutosave").finish_node()
 	if is_boss:
-		if act == 2:
+		if act == maps.size() - 1:
 			ended = true
 			pending = {"type": "finished"}
 			get_node("/root/RunAutosave").enter_node("run:finished", "finished", pending, snapshot(), troop)

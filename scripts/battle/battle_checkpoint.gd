@@ -18,6 +18,10 @@ static func capture(state: BattleState) -> Dictionary:
 	fields.leader_powers = state.leader_powers.duplicate(true)
 	fields.shield_policy = state.shield_policy.duplicate(true)
 	fields.locked_target = state.locked_target
+	fields.abilities = state.abilities.duplicate(true)
+	fields.ability_rules = state.ability_rules.duplicate(true)
+	fields.enemy_blocks = state.enemy_blocks.duplicate()
+	fields.bonus_gold = state.bonus_gold
 	return {"version": VERSION, "troop": TroopCheckpoint.capture(state.troop), "monster": state.monster.duplicate(true), "enemy_runtime": TroopCheckpoint.capture_runtime(state.enemy_runtime), "fields": fields}
 
 static func restore(source: BattleState, data: Dictionary) -> BattleState:
@@ -25,6 +29,16 @@ static func restore(source: BattleState, data: Dictionary) -> BattleState:
 	if not data.get("troop", null) is Dictionary or not TroopCheckpoint.valid(data.troop, source.troop.catalog): return null
 	if not data.get("monster", null) is Dictionary or not source.database.monsters.has(data.monster.get("identity", "")): return null
 	if not data.get("enemy_runtime", null) is Dictionary or not TroopCheckpoint.valid_runtime(data.enemy_runtime): return null
+	if data.fields.has("ability_rules") and not BattleAbilities.valid_rules(data.fields.ability_rules): return null
+	if data.fields.has("enemy_blocks"):
+		if not data.fields.enemy_blocks is Array: return null
+		for index: Variant in data.fields.enemy_blocks:
+			if not TroopCheckpoint._integer(index, 0): return null
+	if data.fields.has("bonus_gold") and not TroopCheckpoint._integer(data.fields.bonus_gold, 0): return null
+	if data.fields.has("abilities"):
+		if not data.fields.abilities is Array: return null
+		for record: Variant in data.fields.abilities:
+			if not record is Dictionary or not TroopCheckpoint._integer(record.get("skill_id"), 1) or not record.get("name") is String or not record.get("description") is String or not TroopCheckpoint._integer(record.get("count"), 1): return null
 	for field: String in FIELDS:
 		if not data.fields.has(field): return null
 	for field: String in ["player_statuses", "enemy_statuses"]:
@@ -51,6 +65,10 @@ static func restore(source: BattleState, data: Dictionary) -> BattleState:
 	if data.fields.get("leader_powers") is Dictionary: result.leader_powers = data.fields.leader_powers.duplicate(true)
 	if data.fields.get("shield_policy") is Dictionary: result.shield_policy = data.fields.shield_policy.duplicate(true)
 	result.locked_target = String(data.fields.get("locked_target", ""))
+	result.abilities.assign(data.fields.get("abilities", []).duplicate(true))
+	result.ability_rules = data.fields.get("ability_rules", BattleAbilities.fresh_rules()).duplicate(true)
+	result.enemy_blocks.assign(data.fields.get("enemy_blocks", []))
+	result.bonus_gold = int(data.fields.get("bonus_gold", 0))
 	result.animate_automatic_skills = source.animate_automatic_skills
 	result.entry_missing_hp = source.entry_missing_hp
 	result.troop.changed.emit()

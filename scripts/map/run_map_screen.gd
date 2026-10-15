@@ -27,6 +27,8 @@ var _traveling := false
 var _travel_serial := 0
 var _travel_target := ""
 var _travel_tween: Tween
+var _theme_banner: MapThemeBanner
+var _starting_floor := false
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -37,6 +39,7 @@ func _ready() -> void:
 	add_theme_font_override("font", font)
 	_build()
 	session.troop_leveled_up.connect(_queue_rank_up)
+	session.travel_mode_changed.connect(_refresh_node_availability)
 	get_node("/root/BattleManager").run_battle_closed.connect(_battle_closed)
 	get_node("/root/ShopManager").node_shop_closed.connect(_finish_node)
 	_rebuild_map()
@@ -126,10 +129,22 @@ func _center_current() -> void:
 	var at: Vector2 = positions.get(id, positions.start)
 	scroll.scroll_vertical = int(at.y - scroll.size.y * 0.72)
 	var available: Array = session.available_nodes()
-	if not available.is_empty() and not is_instance_valid(_modal): (node_buttons[available[0]] as Button).grab_focus()
+	if not available.is_empty() and not is_instance_valid(_modal):
+		var focus_id: String = id if id in available else available[0]
+		(node_buttons[focus_id] as Button).grab_focus()
 
 func _refresh_hud() -> void:
 	if is_instance_valid(_hud): _hud.refresh()
+
+func _refresh_node_availability() -> void:
+	# Update existing buttons in place so a console toggle never recenters the map.
+	var available: Array = session.available_nodes()
+	if not session.pending.is_empty() and session.pending.has("id"): available = [session.pending.id]
+	for id: String in node_buttons:
+		var button: MapNodeButton = node_buttons[id]
+		button.disabled = id not in available
+		button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if not button.disabled else Control.CURSOR_ARROW
+		button.queue_redraw()
 
 func _enter(id: String) -> void:
 	if _blocked(): return
@@ -182,6 +197,7 @@ func _cancel_travel() -> void:
 	_travel_target = ""
 
 func _show_pending() -> void:
+	if _starting_floor or is_instance_valid(_theme_banner): return
 	if is_instance_valid(get_node("/root/EventManager").active): return
 	if session.pending.is_empty(): return
 	if session.ended:
@@ -194,13 +210,33 @@ func _show_pending() -> void:
 				else: _reward_screen()
 			else: _launch_battle.call_deferred()
 		"ancient":
-			_dialog("出征 · " + session.map_theme(), "第%s层\n选择路线，向本层首领进军。" % ["一", "二", "三"][session.act], "node")
-			_action("开始行军", Vector2(240, 265), _finish_node)
+			_start_floor()
 		"chest":
 			_show_loot(1, false)
 		"rest": _rest_screen()
 		"shop": _shop_screen()
 		"unknown": _event_screen()
+
+func _start_floor() -> void:
+	_starting_floor = true
+	# Begin the introduction after the title/formation blackout has cleared.
+	while get_node("/root/ScreenTransition").busy:
+		await get_tree().process_frame
+		if not is_inside_tree(): return
+	var show_intro: bool = not session.graph().get("intro_seen", false)
+	if show_intro and session.mark_map_intro_seen() != OK:
+		_starting_floor = false
+		_message("无法保存地图入口", session.error)
+		return
+	session.complete_node()
+	_rebuild_map()
+	_starting_floor = false
+	if show_intro:
+		_theme_banner = MapThemeBanner.new()
+		_theme_banner.floor_number = session.act + 1
+		_theme_banner.map_theme = session.map_theme()
+		_theme_banner.finished.connect(func() -> void: _theme_banner = null)
+		add_child(_theme_banner)
 
 func _launch_battle() -> void:
 	if is_instance_valid(get_node("/root/EventManager").active): return
@@ -376,7 +412,7 @@ func _close_formation() -> void:
 		_refresh_hud())
 
 func _end_screen(won: bool) -> void:
-	_dialog("行军完成" if won else "部队败北", "三层首领均已击破。" if won else "可以从当前节点入口重新出发。", "end", Vector2(680, 460))
+	_dialog("行军完成" if won else "部队败北", "四层首领均已击破。" if won else "可以从当前节点入口重新出发。", "end", Vector2(680, 460))
 	if not won:
 		_action("重试本节点", Vector2(240, 220), func() -> void:
 			if not session.resume():
@@ -387,10 +423,17 @@ func _end_screen(won: bool) -> void:
 			_show_pending())
 	_action("返回标题", Vector2(240, 325), func() -> void: close_requested.emit())
 
-func _blocked() -> bool:
-	return _traveling or is_instance_valid(_modal) or is_instance_valid(_formation) or _launching or get_node("/root/ScreenTransition").busy or is_instance_valid(get_node("/root/BattleManager").active) or get_tree().get_first_node_in_group("modal_overlay") != null
+func _blocked(allow_banner_pan := false) -> bool:
+	return _starting_floor or (is_instance_valid(_theme_banner) and not allow_banner_pan) or _traveling or is_instance_valid(_modal) or is_instance_valid(_formation) or _launching or get_node("/root/ScreenTransition").busy or is_instance_valid(get_node("/root/BattleManager").active) or get_tree().get_first_node_in_group("modal_overlay") != null
 
 func _input(event: InputEvent) -> void:
+	if is_instance_valid(_theme_banner):
+		if _map_pointer_input(event): return
+		# The banner stays fixed while the map can pan or scroll underneath it.
+		if event is InputEventMouseButton and event.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]: return
+		get_viewport().set_input_as_handled()
+		if event.is_action_pressed("ui_cancel"): _theme_banner.dismiss()
+		return
 	if _traveling:
 		get_viewport().set_input_as_handled()
 		if event.is_action_pressed("ui_cancel"): _cancel_travel()
@@ -415,7 +458,7 @@ func _input(event: InputEvent) -> void:
 		_open_menu()
 
 func _map_pointer_input(event: InputEvent) -> bool:
-	if _blocked():
+	if _blocked(true):
 		_pan_armed = false
 		return false
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
@@ -431,7 +474,7 @@ func _map_pointer_input(event: InputEvent) -> bool:
 			_pressed_node = ""
 			for id: String in node_buttons:
 				var button: Button = node_buttons[id]
-				if not button.disabled and button.get_global_rect().has_point(event.position):
+				if not is_instance_valid(_theme_banner) and not button.disabled and button.get_global_rect().has_point(event.position):
 					_pressed_node = id
 					break
 		elif _pan_armed:

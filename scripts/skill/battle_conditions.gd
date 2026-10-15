@@ -36,6 +36,7 @@ static func _comparison(suffix: String) -> String:
 static func _atom(text: String) -> Dictionary:
 	var clean := _compact(text)
 	if clean == "ALWAYS": return {"kind": "always"}
+	if clean == "敌方普通怪": return {"kind": "number", "key": "enemy_kind", "operator": "==", "target": 1.0}
 	# Keep names intact, including spaces, parentheses and operator characters.
 	var found := _match("^(友方|敌方)\\s*支援\\s*存在\\s*\\[([^\\[\\]]+)\\]$", text.strip_edges())
 	if found != null:

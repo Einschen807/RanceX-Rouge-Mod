@@ -7,7 +7,7 @@ static func capture(troop: TroopState) -> Dictionary:
 	var bonuses: Array[Dictionary] = []
 	for id: int in troop.bonuses: bonuses.append({"id": id, "enabled": bool(troop.bonuses[id])})
 	# Currency is independent of medals and their troop-level progress.
-	return {"gold": troop.gold, "relic_counters": troop.relic_counters.duplicate(true), "relics": troop.relics.duplicate(), "cards": cards, "leaders": troop.leaders.duplicate(), "levels": troop.levels.duplicate(true), "ox_coefficient": troop.ox_coefficient, "bonuses": bonuses, "bonus_points": troop.bonus_points, "medals": troop.medals, "medal_progress": troop.medal_progress, "troop_level": troop.troop_level, "rare_card_bias": troop.rare_card_bias, "encyclopedia_mode": troop.encyclopedia_mode, "damage_rates": troop.damage_rates.duplicate(true), "resistance_rates": troop.resistance_rates.duplicate(true), "skill_runtime": capture_runtime(troop.skill_runtime)}
+	return {"curses": troop.curses.duplicate(true), "gold": troop.gold, "relic_counters": troop.relic_counters.duplicate(true), "relics": troop.relics.duplicate(), "cards": cards, "leaders": troop.leaders.duplicate(), "levels": troop.levels.duplicate(true), "ox_coefficient": troop.ox_coefficient, "bonuses": bonuses, "bonus_points": troop.bonus_points, "medals": troop.medals, "medal_progress": troop.medal_progress, "troop_level": troop.troop_level, "rare_card_bias": troop.rare_card_bias, "encyclopedia_mode": troop.encyclopedia_mode, "damage_rates": troop.damage_rates.duplicate(true), "resistance_rates": troop.resistance_rates.duplicate(true), "skill_runtime": capture_runtime(troop.skill_runtime)}
 
 static func capture_runtime(runtime: SkillRuntime) -> Dictionary:
 	var result := {"turn": runtime.turn, "rng_seed": str(runtime.rng.seed), "rng_state": str(runtime.rng.state)}
@@ -34,6 +34,12 @@ static func valid_runtime(data: Dictionary) -> bool:
 	return true
 
 static func valid(data: Dictionary, catalog: CardCatalog) -> bool:
+	if data.has("curses"):
+		if not data.curses is Array: return false
+		var curse_names: Array[String] = []
+		for record: Variant in data.curses:
+			if not record is Dictionary or not record.get("name") is String or record.name.strip_edges().is_empty() or not record.get("description") is String or record.name in curse_names: return false
+			curse_names.append(record.name)
 	if data.has("gold") and not _integer(data.gold, 0): return false
 	if catalog == null or not data.get("cards", null) is Array or not data.get("leaders", null) is Array: return false
 	if data.leaders.size() != 7 or not data.get("levels", null) is Dictionary or not data.get("bonuses", null) is Array: return false
@@ -85,6 +91,7 @@ static func valid(data: Dictionary, catalog: CardCatalog) -> bool:
 static func restore(troop: TroopState, data: Dictionary) -> bool:
 	if not valid(data, troop.catalog): return false
 	# Validate the complete snapshot before touching the shared formation object.
+	troop.curses.assign(data.get("curses", []).duplicate(true))
 	troop.relics.assign(data.get("relics", []))
 	troop.relic_counters.clear()
 	for name: String in troop.relics:

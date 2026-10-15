@@ -19,6 +19,7 @@ var input_locked := false
 var formation: TroopFormation
 var popup: Control
 var analysis_panel: Control
+var state_panel: BattleStatePanel
 var _analysis_button: OriginalUiButton
 var _previous_leaders: Array[String] = []
 var _cards: Control
@@ -41,6 +42,7 @@ var _formation_button: OriginalUiButton
 var _speed_button: OriginalUiButton
 var _mode_button: OriginalUiButton
 var _restart_button: OriginalUiButton
+var _state_button: OriginalUiButton
 var _enemy_fill: TextureRect
 var _player_fill: TextureRect
 var _enemy_hp_trail: TextureRect
@@ -66,6 +68,8 @@ var _pointer_known := false
 var _status_bars: Array[BattleStatusBar] = []
 var _support_bars: Array[BattleSupportBar] = []
 var _hidden_hp_labels: Dictionary = {}
+## Normal and detail views survive browsing; battle-state changes invalidate both.
+var _card_views: Dictionary = {}
 
 func _process(delta: float) -> void:
 	_restore_skill_hover()
@@ -128,6 +132,7 @@ func _ready() -> void:
 
 func _build_view() -> void:
 	battle.animate_automatic_skills = true
+	battle.defer_skill_repeats = true
 	_build()
 	_presentation = BattlePresentation.new()
 	_presentation.view = self
@@ -168,6 +173,8 @@ func _on_log_added(message: String) -> void:
 func _restart_battle() -> void:
 	if input_locked or is_instance_valid(formation): return
 	var keep_analysis := is_instance_valid(analysis_panel)
+	var keep_state := is_instance_valid(state_panel)
+	var state_page := state_panel.current_page if keep_state else "ability"
 	_close_popup()
 	battle.changed.disconnect(_refresh)
 	battle.log_added.disconnect(_on_log_added)
@@ -182,6 +189,7 @@ func _restart_battle() -> void:
 	_breath = null
 	BattleArt.clear(self)
 	analysis_panel = null
+	state_panel = null
 	_result = null
 	_combo_shown = 0
 	_playing_enemy_intents = false
@@ -193,6 +201,9 @@ func _restart_battle() -> void:
 	lifted_actor = ""
 	_build_view()
 	if keep_analysis: _show_analysis()
+	if keep_state:
+		_show_state_panel()
+		state_panel.select_page(state_page)
 
 func _build() -> void:
 	var background := TextureRect.new()
@@ -298,14 +309,16 @@ func _build() -> void:
 	BattleArt.picture(self, "log_background", Vector2(287, 1046))
 	_log = BattleArt.label(self, "", Vector2(324, 1048), Vector2(1140, 30), 21)
 	BattleArt.button(self, "log_closed", Vector2(1481, 1049), Vector2(150, 31), _show_logs)
-	var analysis := OriginalUiButton.make(self, "square", Vector2(1708, 18), Vector2(92, 92), _show_analysis)
+	_build_preparation()
+	var analysis := OriginalUiButton.make(self, "square", Vector2(1832, 790), Vector2(80, 80), _show_analysis)
 	_analysis_button = analysis
-	analysis.art.scale = Vector2.ONE * (92.0 / 86.0)
+	analysis.art.scale = Vector2.ONE * (80.0 / 86.0)
 	_option_icon(analysis, "help_icon", "解析")
-	_restart_button = OriginalUiButton.make(self, "square", Vector2(1812, 18), Vector2(92, 92), _restart_battle)
+	_restart_button = OriginalUiButton.make(self, "square", Vector2(1744, 790), Vector2(80, 80), _restart_battle)
 	_restart_button.art.scale = analysis.art.scale
 	_option_icon(_restart_button, "restart_icon", "重开")
-	_build_preparation()
+	# Keep information controls in the former defence area, above End Turn.
+	_state_button = BattleStateButton.create(self, _show_state_panel)
 	# MENU stays above the preparation shade and warning artwork in every phase.
 	var menu := OriginalUiButton.make(self, "square", Vector2(20, 990), Vector2(160, 80), func() -> void: get_node("/root/Settings").open())
 	menu.name = "Menu"
@@ -442,6 +455,8 @@ func _refresh() -> void:
 	_start.refresh_art()
 	_restart_button.disabled = input_locked
 	_restart_button.refresh_art()
+	_state_button.disabled = input_locked or battle.phase == "result" or is_instance_valid(formation)
+	_state_button.refresh_art()
 	_refresh_cards()
 	_refresh_ap()
 	if not _playing_enemy_intents:
@@ -489,6 +504,7 @@ func _mount_victory_loot() -> void:
 	_result.queue_free()
 	var loot := VictoryLootScreen.new()
 	loot.troop = battle.troop
+	loot.bonus_gold = battle.bonus_gold
 	loot.pool_id = reward_pool
 	loot.rng = get_node("/root/RunAutosave").rng
 	loot.completed.connect(func() -> void: close_requested.emit())
@@ -533,7 +549,7 @@ func _refresh_intents() -> void:
 		if ultimate:
 			var marker := BattleArt.flat(icon, "intent_ultimate")
 			marker.name = "UltimateWarning"
-		if index == battle.blocked_enemy_action:
+		if index == battle.blocked_enemy_action or index in battle.enemy_blocks:
 			var blocked := BattleArt.picture(button, "status/blocked_small", Vector2(0, icon_height - 56))
 			blocked.name = "BlockedAction"
 		button.mouse_entered.connect(func() -> void: icon.self_modulate = Color(1.45, 1.45, 1.25))
@@ -543,6 +559,7 @@ func _refresh_intents() -> void:
 
 func _refresh_cards() -> void:
 	_clear_skill_preview()
+	_card_views.clear()
 	BattleArt.clear(_cards)
 	for i: int in range(battle.troop.leaders.size()):
 		var name: String = battle.troop.leaders[i]
@@ -555,21 +572,43 @@ func _refresh_cards() -> void:
 			else:
 				BattleArt.picture(_cards, "card_frame", Vector2(198 + 218 * i, 728))
 			continue
-		var card := BattleCard.new()
-		card.configure(battle, name, operation_mode, selected_card == name, input_locked)
-		card.position = Vector2(200 + 218 * i, 730)
-		card.skill_requested.connect(_use_skill)
-		card.card_selected.connect(_select_card)
-		card.skill_hovered.connect(_preview_skill_ap)
-		_cards.add_child(card)
-		card.set_hovered(name == _hovered_card)
-		card.visible = name != lifted_actor
+		var detail := operation_mode == 1 and selected_card == name
+		_card_views[name] = {detail: _make_card_view(name, i, detail)}
 	if not lifted_actor.is_empty():
 		var slot := battle.troop.leaders.find(lifted_actor)
 		if slot >= 0:
 			BattleArt.picture(_cards, "card_frame", Vector2(198 + 218 * slot, 728))
 	_leader_power_layer.lifted = lifted_actor
 	_leader_power_layer.sync(battle, operation_mode, selected_card, animation_speed())
+
+func _make_card_view(actor: String, slot: int, detail: bool) -> BattleCard:
+	var card := BattleCard.new()
+	card.configure(battle, actor, operation_mode, detail, input_locked)
+	card.position = Vector2(200 + 218 * slot, 730)
+	card.skill_requested.connect(_use_skill)
+	card.card_selected.connect(_select_card)
+	card.skill_hovered.connect(_preview_skill_ap)
+	_cards.add_child(card)
+	card.set_hovered(actor == _hovered_card)
+	card.visible = actor != lifted_actor
+	return card
+
+func _sync_card_selection() -> void:
+	_clear_skill_preview()
+	for actor: String in _card_views:
+		var detail := operation_mode == 1 and selected_card == actor
+		var variants: Dictionary = _card_views[actor]
+		if not variants.has(detail):
+			variants[detail] = _make_card_view(actor, battle.troop.leaders.find(actor), detail)
+		for card: BattleCard in variants.values():
+			var shown := card.selected == detail and actor != lifted_actor
+			card.visible = shown
+			card.process_mode = Node.PROCESS_MODE_INHERIT if shown else Node.PROCESS_MODE_DISABLED
+			card.set_hovered(shown and actor == _hovered_card)
+			if not shown:
+				for button: OriginalUiButton in card.skill_buttons: button.sync_hover(false)
+	_leader_power_layer.sync(battle, operation_mode, selected_card, animation_speed())
+	_apply_speed(_cards)
 
 func set_lifted_actor(actor: String) -> void:
 	lifted_actor = actor
@@ -659,7 +698,7 @@ func _hover_card(at: Vector2) -> void:
 	if _browse_cards and selected_card != hovered:
 		selected_card = hovered
 		if hovered.is_empty(): _browse_cards = false
-		_refresh_cards()
+		_sync_card_selection()
 	for child: Node in _cards.get_children():
 		if child is BattleCard: child.set_hovered(child.card.name == hovered)
 
@@ -691,7 +730,7 @@ func _apply_speed(node: Node) -> void:
 	if node is BattleApBar:
 		node.playback_speed = animation_speed()
 	if node is OriginalFlatPlayer:
-		node.playback_speed = animation_speed() * float(node.get_meta("animation_rate", 1.0))
+		node.playback_speed = 1.0 if node.get_meta("fixed_ui_speed", false) else animation_speed() * float(node.get_meta("animation_rate", 1.0))
 	if node is CPUParticles2D:
 		node.speed_scale = animation_speed()
 	for child: Node in node.get_children():
@@ -718,7 +757,7 @@ func _select_card(name: String) -> void:
 		selected_card = "" if selected_card == name else name
 		_browse_cards = not selected_card.is_empty()
 		_hovered_card = name
-		_refresh_cards()
+		_sync_card_selection()
 
 func _start_battle() -> void:
 	if input_locked or get_node("/root/ScreenTransition").busy: return
@@ -821,6 +860,7 @@ func _popup_frame(at: Vector2, dimensions: Vector2) -> Control:
 
 func _close_popup() -> void:
 	if is_instance_valid(popup):
+		if popup.is_in_group("modal_overlay"): popup.remove_from_group("modal_overlay")
 		popup.hide()
 		popup.queue_free()
 	popup = null
@@ -859,9 +899,11 @@ func _show_analysis() -> void:
 		analysis_panel.queue_free()
 		analysis_panel = null
 		_analysis_button.selected = false
+		_analysis_button.grab_focus()
 		return
-	var frame := BattleArt.picture(self, "monster_description", Vector2(1110, 120))
+	var frame := BattleArt.picture(self, "monster_description", Vector2(458, 16))
 	frame.size.y = maxf(frame.size.y, 420.0)
+	frame.scale = BattleArt.INFORMATION_PANEL_SCALE
 	frame.name = "AnalysisPanel"
 	analysis_panel = frame
 	_analysis_button.selected = true
@@ -932,6 +974,25 @@ func _analysis_text(parent: Control, title: String, text: String, at: Vector2, d
 	label.add_theme_constant_override("outline_size", outline)
 	return label
 
+func _show_state_panel() -> void:
+	if input_locked or is_instance_valid(formation) or battle.phase == "result" or get_tree().get_first_node_in_group("modal_overlay") != null or get_node("/root/ScreenTransition").busy: return
+	if is_instance_valid(state_panel):
+		_close_state_panel()
+		return
+	var panel := BattleStatePanel.new()
+	panel.battle = battle
+	state_panel = panel
+	_state_button.selected = true
+	add_child(panel)
+
+func _close_state_panel() -> void:
+	if not is_instance_valid(state_panel): return
+	state_panel.hide()
+	state_panel.queue_free()
+	state_panel = null
+	_state_button.selected = false
+	_state_button.grab_focus()
+
 func _show_logs() -> void:
 	if input_locked or is_instance_valid(formation): return
 	_clear_skill_preview()
@@ -984,7 +1045,11 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		if is_instance_valid(popup) and popup != _result:
 			_close_popup()
+		elif is_instance_valid(state_panel):
+			_close_state_panel()
+		elif is_instance_valid(analysis_panel):
+			_show_analysis()
 		elif _browse_cards:
 			_browse_cards = false
 			selected_card = ""
-			_refresh_cards()
+			_sync_card_selection()

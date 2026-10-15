@@ -56,8 +56,9 @@ static func command(id: int, value: int) -> Dictionary:
 static func outgoing_ratio(statuses: Dictionary) -> float:
 	return maxf(0.0, 1.0 - (0.2 if statuses.has(WEAK) else 0.0) - (0.5 if statuses.has(LETHAL_WOUND) else 0.0))
 
-static func incoming_ratio(statuses: Dictionary, element: int) -> float:
+static func incoming_ratio(statuses: Dictionary, element: Variant) -> float:
 	var extra := (0.2 if statuses.has(WEAK) else 0.0) + (1.0 if statuses.has(SLEEP) else 0.0)
-	if (element == 1 and statuses.has(BURN)) or (element == 2 and statuses.has(FREEZE)) or (element == 3 and statuses.has(SHOCK)):
-		extra += 0.5
+	var elements: Array = element if element is Array else [int(element)]
+	for pair: Array in [[1, BURN], [2, FREEZE], [3, SHOCK]]:
+		if pair[0] in elements and statuses.has(pair[1]): extra += 0.5
 	return 1.0 + extra

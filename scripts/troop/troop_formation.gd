@@ -238,6 +238,10 @@ func _refresh() -> void:
 	_apply_mode_view(bonuses_visible)
 
 func _refresh_faction_cards() -> void:
+	var selected_leader := troop.leader_for_faction(selected_faction)
+	for child: Node in _leader_area.get_children():
+		if child is CardWidget:
+			child.set_leader_selected(child.card.name == selected_leader)
 	_clear(_grid)
 	var cards: Array[Dictionary] = []
 	for c: Dictionary in troop.available:
@@ -263,6 +267,7 @@ func _display_name(record: Dictionary) -> String:
 func _card(record: Dictionary, is_leader: bool) -> CardWidget:
 	var widget := CardWidget.new()
 	widget.setup(record, troop, is_leader, detail_mode, preview_upgrades)
+	widget.leader_selected = is_leader and record.faction == selected_faction
 	widget.card_clicked.connect(_on_card_clicked)
 	widget.leader_removed.connect(troop.remove)
 	widget.card_dropped.connect(_deploy)

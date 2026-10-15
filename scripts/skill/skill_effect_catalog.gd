@@ -3,7 +3,7 @@ class_name SkillEffectCatalog
 ## The fifth skill field selects an effect by filename, including its own sound.
 const ROOT := "res://assets/effects/"
 const MAGIC := ["炎", "冰", "雷", "光", "暗"]
-const DEFAULTS := {1: "突袭攻击", 2: "远程攻击", 4: "附加效果", 5: "附加效果", 6: "附加效果"}
+const DEFAULTS := {1: "突袭攻击", 2: "远程攻击", 4: "附加效果", 5: "附加效果", 6: "附加效果", 7: "附加效果"}
 static var _catalog: Dictionary = {}
 static var _warned: Dictionary = {}
 

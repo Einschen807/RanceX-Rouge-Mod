@@ -45,6 +45,17 @@ var player_has_acted := false
 var intent: Dictionary = {}
 var outcome := ""
 var logs: Array[String] = []
+## Successful friendly type-7 activations; never shared with the persistent troop.
+var abilities: Array[Dictionary] = []
+var ability_rules := BattleAbilities.fresh_rules()
+var prepared_repeats: Array[Dictionary] = []
+var pending_skill_repeats: Array[Dictionary] = []
+var pending_counter_feedback: Array[Dictionary] = []
+var defer_skill_repeats := false
+var resolving_skill_repeats := false
+var enemy_blocks: Array[int] = []
+var bonus_gold := 0
+var _lethal_skill := 0
 var animate_automatic_skills := false
 var pending_automatic_skills: Array[Dictionary] = []
 var enemy_actions_done := 0
@@ -80,6 +91,14 @@ func configure(state: TroopState, monsters: MonsterCatalog, identity: String) ->
 	pending_support_feedback.clear()
 	pending_relic_actions.clear()
 	pending_down_replacements.clear()
+	abilities.clear()
+	ability_rules = BattleAbilities.fresh_rules()
+	prepared_repeats.clear()
+	pending_skill_repeats.clear()
+	pending_counter_feedback.clear()
+	enemy_blocks.clear()
+	bonus_gold = 0
+	_lethal_skill = 0
 	troop.down_cards.clear()
 	troop.retired_characters.clear()
 	troop.clear_battle_formation_edit()
@@ -150,7 +169,7 @@ func start() -> bool:
 		var ctx := context("enemy")
 		ctx.battle_opening = true
 		var result := enemy_runtime.use_skill(monster.identity, troop.catalog.skills[id], ctx)
-		log_message("%s 开局追加 %s" % [monster.name, troop.catalog.skills[id].name])
+		log_message("%s 开局追加 %s" % [monster.name, BattleSkillLog.skill_name(self, troop.catalog.skills[id], result.commands)])
 		_prepare_accuracy("enemy", result.commands, troop.catalog.skills[id], int(monster.get("element", 0)))
 		apply_skill_commands("enemy", id, result.commands)
 		if phase == "result": break
@@ -165,6 +184,9 @@ func context(side: String, card: Dictionary = {}) -> Dictionary:
 	for entry: Dictionary in BattleSupports.group(self, side): supports.append(BattleSupports.definition(self, entry).identity)
 	var result := {"ap": ap, "combo": combo, "round": round, "hp": player_hp if side == "player" else enemy_hp, "hp_max": player_max_hp if side == "player" else enemy_max_hp, "player_hp": player_hp, "player_hp_max": player_max_hp, "enemy_hp": enemy_hp, "enemy_hp_max": enemy_max_hp, "deployed_at": at, "element": card.get("element", 0) if side == "player" else monster.get("element", 0), "actor": card.get("name", "") if side == "player" else monster.identity, "actor_identity": card.get("identity", "") if side == "player" else monster.identity, "actor_slot": troop.leaders.find(card.get("name", "")) if side == "player" and not card.is_empty() else (0 if side == "enemy" else -1), "auto_trigger": 2, "supports": supports}
 	# Conditions name absolute battle sides, regardless of the acting skill's side.
+	result.gold = troop.gold
+	result.enemy_kind = int(monster.kind)
+	result.assault_bonus = float(ability_rules.assault) if side == "player" else 0.0
 	for condition_side: String in ["player", "enemy"]:
 		var side_supports: Array[Dictionary] = []
 		for entry: Dictionary in BattleSupports.group(self, condition_side):
@@ -208,14 +230,16 @@ func prepare_player_skill(name: String, id: int, slot: int = -1) -> Dictionary:
 	player_has_acted = true
 	if swap_was_available:
 		next_swap_round = round + swap_interval()
-	log_message("%s 使用 %s" % [name, skill.name])
 	BattleLeaderPowers.prepare(self, "player", skill, result.commands)
+	BattleAbilities.prepare(self, name, skill)
+	log_message("%s 使用 %s" % [name, BattleSkillLog.skill_name(self, skill, result.commands)])
 	_prepare_accuracy("player", result.commands, skill, int(card_element(name)))
 	return result
 
 func begin_enemy_turn() -> bool:
 	if phase != "player":
 		return false
+	ability_rules.echoes.clear()
 	BattleLeaderPowers.clear(self, "player")
 	_decay_statuses("player")
 	_check_result()
@@ -244,7 +268,7 @@ func _enemy_skill_context(skill: Dictionary) -> Dictionary:
 
 func can_use_enemy_skill(id: int) -> bool:
 	if phase != "enemy" or not troop.catalog.skills.has(id): return false
-	if enemy_down or has_status("enemy", BattleStatusEffects.SLEEP) or enemy_actions_done == blocked_enemy_action: return false
+	if enemy_down or has_status("enemy", BattleStatusEffects.SLEEP) or enemy_actions_done == blocked_enemy_action or enemy_actions_done in enemy_blocks: return false
 	var skill: Dictionary = troop.catalog.skills[id]
 	if BattleSupports.attack_blocked(self, "enemy", skill): return false
 	return enemy_runtime.can_use(monster.identity, skill, _enemy_skill_context(skill))
@@ -264,6 +288,10 @@ func prepare_enemy_skill(id: int) -> Dictionary:
 	if phase != "enemy" or not troop.catalog.skills.has(id):
 		return {"ok": false, "commands": []}
 	var skill: Dictionary = troop.catalog.skills[id]
+	if enemy_actions_done in enemy_blocks:
+		enemy_actions_done += 1
+		log_message("%s的第%d个行动被阻止" % [monster.name, enemy_actions_done])
+		return {"ok": false, "commands": [], "ap_spent": 0}
 	if enemy_down or BattleSupports.attack_blocked(self, "enemy", skill):
 		enemy_actions_done += 1
 		log_message("%s因%s无法使用%s" % [monster.name, "DOWN" if enemy_down else "攻击封锁", skill.name])
@@ -279,7 +307,7 @@ func prepare_enemy_skill(id: int) -> Dictionary:
 	if result.ok:
 		BattleLeaderPowers.prepare(self, "enemy", skill, result.commands)
 		_prepare_accuracy("enemy", result.commands, skill, int(monster.get("element", 0)))
-		log_message("%s 使用 %s" % [monster.name, skill.name])
+		log_message("%s 使用 %s" % [monster.name, BattleSkillLog.skill_name(self, skill, result.commands)])
 		pending_enemy_skill = id
 		pending_enemy_commands.assign(result.commands)
 	else:
@@ -289,6 +317,7 @@ func prepare_enemy_skill(id: int) -> Dictionary:
 func finish_enemy_turn() -> void:
 	if phase != "enemy":
 		return
+	enemy_blocks.clear()
 	BattleLeaderPowers.clear(self, "enemy")
 	_decay_statuses("enemy")
 	_check_result()
@@ -348,12 +377,13 @@ func prepare_automatic_skill(actor: String, id: int, slot: int) -> Dictionary:
 	var result := runtime.use_skill(actor, skill, context("player", card), slot)
 	if result.get("ok", false):
 		BattleLeaderPowers.prepare(self, "player", skill, result.commands)
+		BattleAbilities.prepare(self, actor, skill)
 		_prepare_accuracy("player", result.commands, skill, int(card.element))
 	return result
 
 func apply_automatic_skill(actor: String, id: int, result: Dictionary) -> Dictionary:
 	if result.get("ok", false):
-		log_message("%s 自动发动 %s" % [actor, troop.catalog.skills[id].name])
+		log_message("%s 自动发动 %s" % [actor, BattleSkillLog.skill_name(self, troop.catalog.skills[id], result.commands)])
 		apply_skill_commands("player", id, result.commands)
 	return result
 
@@ -366,9 +396,24 @@ func apply_skill_commands(side: String, id: int, commands: Array, finished := tr
 			pending_enemy_commands.clear()
 			pending_enemy_skill = 0
 	if finished:
+		if side == "player" and int(troop.catalog.skills[id].type) == 7:
+			_record_ability(troop.catalog.skills[id])
+		if side == "player": BattleAbilities.finish_action(self, id, commands)
 		BattleSupports.after_action(self, side)
 		_check_result()
+		BattleAbilities.resolve_pending(self)
 	changed.emit()
+
+func _record_ability(skill: Dictionary) -> void:
+	var found := false
+	for record: Dictionary in abilities:
+		if int(record.skill_id) == int(skill.id):
+			record.count = int(record.count) + 1
+			found = true
+			break
+	if not found: abilities.append({"skill_id": int(skill.id), "name": String(skill.name), "description": "", "count": 1})
+	for record: Dictionary in abilities:
+		record.description = BattleAbilities.description(self, troop.catalog.skills[int(record.skill_id)])
 
 func _choose_intent() -> void:
 	intent = database.choose(monster.behavior, context("enemy"))
@@ -385,13 +430,15 @@ func damage_breakdown(side: String, skill: Dictionary, command: Dictionary) -> D
 	var base_damage := float(command.amount) * (1.0 + troop.rate(kind) / 100.0 if side == "player" else 1.0)
 	var base_resistance := troop.rate(kind + "_resist") if player_target else float(monster.get(kind + "_resist", 0.0))
 	var additional_resistance := float(extra_resistance_rates[target_side][kind]) + BattleSupports.rate(self, target_side, 7 if kind == "magic" else 6)
+	additional_resistance += BattleLeaderPassives.total(self, target_side, 7 if kind == "magic" else 6)
 	var additional_damage := float(extra_damage_rates[side]) / 100.0 + (player_at_bonus if side == "player" else enemy_at_bonus) / 100.0
 	additional_damage += float(received_damage_rates[target_side]) / 100.0
 	additional_damage += float(combat_damage_rates[side][kind]) / 100.0
 	additional_damage += BattleSupports.rate(self, side, 9 if kind == "magic" else 8) / 100.0
+	additional_damage += BattleLeaderPassives.total(self, side, 9 if kind == "magic" else 8) / 100.0
 	additional_damage += (BattleSupports.strategist(self, side) - BattleSupports.strategist(self, "enemy" if side == "player" else "player")) / 100.0
 	additional_damage += BattleStatusEffects.outgoing_ratio(statuses(side)) - 1.0
-	additional_damage += BattleStatusEffects.incoming_ratio(statuses(target_side), int(command.get("element", 0))) - 1.0
+	additional_damage += BattleStatusEffects.incoming_ratio(statuses(target_side), command.get("elements", int(command.get("element", 0)))) - 1.0
 	additional_damage += BattleLeaderPowers.extra_rate(self, side, skill, command) / 100.0
 	# Read the live count before this impact increments it: later hits benefit too.
 	if side == "player" and not self_target: additional_damage += combo * 0.1
@@ -401,6 +448,7 @@ func damage_breakdown(side: String, skill: Dictionary, command: Dictionary) -> D
 
 func _apply(side: String, skill: Dictionary, commands: Array) -> void:
 	for command: Dictionary in commands:
+		if side == "enemy" and enemy_hp <= 0.0: break
 		var self_target: bool = command.get("target", "self" if command.kind in ["heal", "buff"] else "opponent") == "self"
 		var player_target := (side == "player") == self_target
 		var target_side := "player" if player_target else "enemy"
@@ -410,6 +458,7 @@ func _apply(side: String, skill: Dictionary, commands: Array) -> void:
 			"doushin_reaim":
 				BattleDoushinTargets.reaim(self)
 			"damage":
+				var hp_before := player_hp if player_target else enemy_hp
 				var amount := float(damage_breakdown(side, skill, command).unblocked_damage)
 				BattleLeaderPowers.consume(self, side, skill, command)
 				if not command.has("miss"):
@@ -426,11 +475,51 @@ func _apply(side: String, skill: Dictionary, commands: Array) -> void:
 					player_hp = remaining_hp
 				else:
 					enemy_hp = remaining_hp
+					if hp_before > 0.0 and enemy_hp <= 0.0: _lethal_skill = int(skill.id)
 				if side == "player": combo = mini(combo_limit, combo + 1)
 				if player_target: player_damage_total += amount
 				else: enemy_damage_total += amount
 				_log_damage(target_side, amount)
 				if amount > 0.0: remove_status(target_side, BattleStatusEffects.SLEEP)
+				if side == "enemy" and player_target and player_hp < hp_before and int(skill.type) in [1, 2, 3]: BattleAbilities.counter(self)
+			"battle_ability":
+				ability_rules[String(command.rule)] += command.amount
+			"next_skill_echo":
+				ability_rules.echoes.append({"remaining": int(command.count)})
+			"block_enemy_action":
+				if int(command.index) not in enemy_blocks: enemy_blocks.append(int(command.index))
+			"restore_ap":
+				ap = mini(ap_max(), ap + int(command.amount))
+			"spend_shells":
+				troop.spend_gold(mini(troop.gold, int(command.amount)))
+			"kill_bonus":
+				if side == "player" and enemy_hp <= 0.0 and _lethal_skill == int(skill.id):
+					bonus_gold += int(command.amount)
+					_lethal_skill = 0
+			"cleanse":
+				var candidates: Array = statuses(target_side).keys()
+				candidates.erase(BattleStatusEffects.PURITY)
+				for i: int in range(mini(int(command.count), candidates.size())):
+					var index := runtime.rng.randi_range(0, candidates.size() - 1)
+					remove_status(target_side, int(candidates[index]))
+					candidates.remove_at(index)
+			"assassinate":
+				if player_target:
+					player_damage_total += player_hp
+					player_hp = 0.0
+				else:
+					enemy_damage_total += enemy_hp
+					enemy_hp = 0.0
+			"hp_fraction":
+				if command.lose:
+					lose_hp(target_side, float(command.percent), command)
+				elif not has_status(target_side, BattleStatusEffects.ANTI_REGEN):
+					var hp := player_hp if player_target else enemy_hp
+					var maximum := player_max_hp if player_target else enemy_max_hp
+					var basis := hp if command.basis == "current" else maxf(0.0, maximum - hp)
+					var amount := basis * float(command.percent) / 100.0
+					if player_target: player_hp = minf(maximum, hp + amount)
+					else: enemy_hp = minf(maximum, hp + amount)
 			"heal":
 				if has_status(target_side, BattleStatusEffects.ANTI_REGEN):
 					_status_feedback(target_side, BattleStatusEffects.ANTI_REGEN, "trigger")
@@ -476,7 +565,10 @@ func _apply(side: String, skill: Dictionary, commands: Array) -> void:
 func lose_hp(side: String, percent: float, command: Dictionary = {}) -> float:
 	var hp := player_hp if side == "player" else enemy_hp
 	var maximum := player_max_hp if side == "player" else enemy_max_hp
-	var amount := minf(hp, maxf(0.0, maximum * percent / 100.0))
+	var basis := maximum
+	if command.get("basis", "") == "current": basis = hp
+	elif command.get("basis", "") == "missing": basis = maxf(0.0, maximum - hp)
+	var amount := minf(hp, maxf(0.0, basis * percent / 100.0))
 	if BattleSupports.absorb(self, side, command, amount): return 0.0
 	amount = BattleShields.absorb(self, side, amount)
 	if side == "player":
@@ -508,6 +600,12 @@ func down_leaders(side: String, selector: int, actor_slot: int) -> void:
 			var tmp := slots[i]
 			slots[i] = slots[j]
 			slots[j] = tmp
+		var preferred: Array[int] = []
+		var remaining: Array[int] = []
+		for slot: int in slots:
+			if BattleLeaderPassives.value(self, troop.leaders[slot], 49) > 0.0: preferred.append(slot)
+			else: remaining.append(slot)
+		slots = preferred + remaining
 		slots.resize(mini(selector, slots.size()))
 	elif selector in range(11, 18): slots.append(selector - 11)
 	elif selector in [21, 22] and actor_slot >= 0: slots.append(actor_slot + (-1 if selector == 21 else 1))
@@ -591,6 +689,8 @@ func add_status(side: String, id: int, rounds: int) -> bool:
 func remove_status(side: String, id: int) -> void:
 	if not statuses(side).has(id): return
 	statuses(side).erase(id)
+	if id == BattleStatusEffects.CONFUSION and side == "player": blocked_player_actors.clear()
+	if id in [BattleStatusEffects.CONFUSION, BattleStatusEffects.FEAR] and side == "enemy": blocked_enemy_action = -1
 	status_event.emit(side, id, "removed")
 
 func _status_feedback(side: String, id: int, event: String, damage := 0.0) -> void:

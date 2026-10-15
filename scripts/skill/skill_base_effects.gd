@@ -4,10 +4,15 @@ class_name SkillBaseEffects
 ## Resolution returns commands to a future battle consumer, and never reads description text.
 
 static func has_effect(id: int) -> bool:
-	return id in range(0, 10) or id in range(30, 37) or id in range(40, 45) or BattleStatusEffects.valid(id)
+	return id in range(0, 10) or id in range(30, 37) or id in range(40, 51) or BattleStatusEffects.valid(id)
 
 static func valid_value(id: int, value: int) -> bool:
 	if id in [3, 4]: return true
+	if id == 45: return value >= 1
+	if id in [46, 47]: return absi(value) < 2000 and absi(value) % 1000 <= 100
+	if id == 48: return SkillElements.valid(value)
+	if id == 49: return value in [0, 1]
+	if id == 50: return value == 1
 	if id in range(6, 10): return true
 	if id == 5: return value in range(1, 8) or value in range(11, 18) or value in [21, 22]
 	if id in BattleLeaderPowers.NAMES: return BattleLeaderPowers.valid_selector(value)
@@ -31,13 +36,22 @@ static func resolve(skill: Dictionary, context: Dictionary) -> Array[Dictionary]
 		var effect: int = skill.get("effect%d" % n, 0)
 		var value: int = skill.get("value%d" % n, 0)
 		if effect == 1:
+			var multiplier := value / 100.0
+			if String(skill.get("name", "")).contains("突击"): multiplier += float(context.get("assault_bonus", 0.0))
+			if int(skill.get("custom", 0)) == 1: multiplier += DesignedSkillEffects.attack_bonus(int(skill.id), context)
 			# Combo repeats only attack commands. Other numbered effects execute once.
 			for hit: int in range(hits):
-				commands.append({"kind": "damage", "amount": float(context.get("deployed_at", 0.0)) * value / 100.0, "multiplier": value / 100.0, "hit": hit + 1, "element": int(context.get("element", 0))})
+				commands.append({"kind": "damage", "amount": float(context.get("deployed_at", 0.0)) * multiplier, "multiplier": multiplier, "hit": hit + 1, "element": int(context.get("element", 0)), "elements": SkillElements.resolve(skill, int(context.get("element", 0)))})
 		elif effect in [3, 4]:
 			commands.append({"kind": "heal_percent" if effect == 3 else "lose_percent", "percent": absi(value), "target": "self" if value >= 0 else "opponent"})
 		elif effect == 5:
 			commands.append({"kind": "down", "selector": value, "target": "self"})
+		elif effect == 45:
+			commands.append({"kind": "cleanse", "count": value, "target": "self"})
+		elif effect in [46, 47]:
+			commands.append({"kind": "hp_fraction", "basis": "current" if effect == 46 else "missing", "lose": absi(value) >= 1000, "percent": absi(value) % 1000, "target": "self" if value >= 0 else "opponent"})
+		elif effect == 50:
+			commands.append({"kind": "assassinate", "target": "opponent"})
 		elif effect in range(6, 10):
 			commands.append({"kind": "buff", "stat": {6: "physical_resist", 7: "magic_resist", 8: "physical", 9: "magic"}[effect], "amount": value, "target": "self"})
 		elif effect in [30, 31]:

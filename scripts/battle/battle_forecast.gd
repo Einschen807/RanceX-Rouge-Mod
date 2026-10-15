@@ -18,6 +18,8 @@ static func snapshot(source: BattleState) -> BattleState:
 	formation.catalog = source.troop.catalog
 	formation.relics.assign(source.troop.relics)
 	formation.relic_counters = source.troop.relic_counters.duplicate(true)
+	formation.curses.assign(source.troop.curses.duplicate(true))
+	formation.gold = source.troop.gold
 	formation.available.assign(source.troop.available)
 	formation.leaders.assign(source.troop.leaders)
 	for field: String in ["levels", "bonuses", "damage_rates", "resistance_rates", "down_cards", "retired_characters", "pending_retired_characters"]: formation.set(field, source.troop.get(field).duplicate(true))
@@ -33,6 +35,12 @@ static func snapshot(source: BattleState) -> BattleState:
 	formation.skill_runtime = copy.runtime
 	copy.enemy_runtime = _runtime(source.enemy_runtime)
 	copy.intent = source.intent.duplicate(true)
+	copy.abilities.assign(source.abilities.duplicate(true))
+	copy.ability_rules = source.ability_rules.duplicate(true)
+	copy.prepared_repeats.assign(source.prepared_repeats.duplicate(true))
+	copy.pending_skill_repeats.assign(source.pending_skill_repeats.duplicate(true))
+	copy.enemy_blocks.assign(source.enemy_blocks)
+	copy.bonus_gold = source.bonus_gold
 	copy.pending_enemy_skill = source.pending_enemy_skill
 	copy.pending_enemy_commands.assign(source.pending_enemy_commands.duplicate(true))
 	copy.player_statuses = source.player_statuses.duplicate(true)

@@ -7,6 +7,8 @@ signal relic_acquired(display_name: String, source_position: Vector2)
 var relics: Array[String] = []
 ## Acquired relic progress belongs to the run, surviving battle boundaries.
 var relic_counters: Dictionary = {}
+## Run curses persist across battles, separately from combat status ailments.
+var curses: Array[Dictionary] = []
 var catalog: CardCatalog
 var available: Array[Dictionary] = []
 var leaders: Array[String] = ["", "", "", "", "", "", ""]
@@ -44,6 +46,19 @@ func add_gold(amount: int) -> void:
 	if amount <= 0: return
 	gold += amount
 	changed.emit()
+
+static func parse_curse(argument: String) -> Dictionary:
+	var parts := argument.split("|", true, 1)
+	var name := parts[0].strip_edges()
+	if name.is_empty(): return {}
+	return {"name": name, "description": parts[1].strip_edges().replace("r", "\n") if parts.size() == 2 else ""}
+
+func acquire_curse(display_name: String, description := "") -> bool:
+	var name := display_name.strip_edges()
+	if name.is_empty() or curses.any(func(record: Dictionary) -> bool: return record.name == name): return false
+	curses.append({"name": name, "description": description})
+	changed.emit()
+	return true
 
 func spend_gold(amount: int) -> bool:
 	if amount < 0 or gold < amount: return false

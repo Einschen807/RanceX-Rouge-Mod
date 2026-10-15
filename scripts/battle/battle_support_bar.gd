@@ -4,7 +4,7 @@ signal detail_requested(side: String, uid: int)
 var view: BattleScene
 var side := "enemy"
 var entries: Dictionary = {}
-const DISPLAY_SCALE := 0.8
+const DISPLAY_SCALE := 1.0
 
 func _display_scale() -> float:
 	return DISPLAY_SCALE * minf(1.0, 7.0 / maxf(7.0, BattleSupports.group(view.battle, side).size()))
@@ -15,8 +15,10 @@ func _ready() -> void:
 
 func support_position(index: int) -> Vector2:
 	var count := BattleSupports.group(view.battle, side).size()
-	var spacing := minf(53.0, 318.0 / maxf(1.0, count - 1))
-	return Vector2(1693 if side == "player" else 27, 436 - index * spacing)
+	# Seven native-size rows fill the space above HP, leaving 16px at the top.
+	var spacing := minf(70.0, 420.0 / maxf(1.0, count - 1))
+	var x := 1893.0 - 250.0 * _display_scale() if side == "player" else 27.0
+	return Vector2(x, 436 - index * spacing)
 
 func sync() -> void:
 	var group := BattleSupports.group(view.battle, side)

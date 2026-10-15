@@ -11,6 +11,7 @@ var asset := "digits_summary"
 var kerning := -2.0
 var alignment: HorizontalAlignment = HORIZONTAL_ALIGNMENT_RIGHT
 var abbreviate := true
+var fit_height := false
 
 func _draw() -> void:
 	if atlas == null:
@@ -23,6 +24,7 @@ func _draw() -> void:
 	var height := float(atlas.get_height())
 	var length := shown.length() * (width + kerning) - kerning
 	var fit := minf(1.0, size.x / maxf(1.0, length))
+	if fit_height: fit = minf(fit, size.y / maxf(1.0, height))
 	var x := (size.x - length * fit) / 2.0 if alignment == HORIZONTAL_ALIGNMENT_CENTER else (size.x - length * fit if alignment == HORIZONTAL_ALIGNMENT_RIGHT else 0.0)
 	var y := (size.y - height * fit) / 2.0
 	for glyph: String in shown:

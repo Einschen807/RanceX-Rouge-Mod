@@ -68,7 +68,15 @@ func use_skill(actor: String, skill: Dictionary, context: Dictionary, slot: int 
 	last_turn[key] = turn
 	run_uses[key] = int(run_uses.get(key, 0)) + 1
 	battle_uses[key] = int(battle_uses.get(key, 0)) + 1
+	return {"ok": true, "commands": resolve_commands(skill, context), "ap_spent": spent, "effect_asset": skill.effect_asset, "cut_in": skill.get("cut_in", "")}
+
+static func resolve_commands(skill: Dictionary, context: Dictionary) -> Array[Dictionary]:
 	var commands := SkillBaseEffects.resolve(skill, context)
 	if skill.custom == 1:
 		commands.append_array(SkillCustomEffects.resolve(skill.id, context))
-	return {"ok": true, "commands": commands, "ap_spent": spent, "effect_asset": skill.effect_asset, "cut_in": skill.get("cut_in", "")}
+	for command: Dictionary in commands:
+		command.actor = command.get("actor", context.get("actor", ""))
+		command.actor_identity = command.get("actor_identity", context.get("actor_identity", ""))
+		command.actor_slot = command.get("actor_slot", context.get("actor_slot", -1))
+		command.support_source = command.get("support_source", context.get("support_source", false))
+	return commands

@@ -3,6 +3,8 @@ class_name EventCommands
 ## Preflight inventory operations in order before a destructive exchange starts.
 static func validate(commands: PackedStringArray, troop: TroopState, session: Node) -> String:
 	var owned := troop.relics.duplicate()
+	var curses: Array[String] = []
+	for record: Dictionary in troop.curses: curses.append(record.name)
 	var gold := troop.gold
 	var medals := maxi(troop.medals, troop.medal_progress)
 	var relics := RelicCatalog.new()
@@ -31,6 +33,11 @@ static func validate(commands: PackedStringArray, troop: TroopState, session: No
 					if not relics.by_name.has(name): return "未找到遗物：" + name
 					if name in owned: return "已拥有遗物：" + name
 					owned.append(name)
+				elif kind == "curse":
+					var curse := TroopState.parse_curse(name)
+					if curse.is_empty(): return "用法：add curse 名称|说明"
+					if curse.name in curses: return "已持有诅咒：" + curse.name
+					curses.append(curse.name)
 				elif kind == "card":
 					var card := troop.catalog.find_name(name)
 					if card.is_empty() or CardCatalog.is_upgraded(card): return "未找到基础卡牌：" + name

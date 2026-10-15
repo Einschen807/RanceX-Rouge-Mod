@@ -1,20 +1,23 @@
 extends RefCounted
 class_name RunPoolCatalog
-const LAYERS := ["一层", "二层", "三层"]
-const MONSTER_LAYERS := ["一层", "二层", "三层", "四层"]
-const MAP_THEMES := [["荒野", "遗迹"], ["利萨斯", "自由都市", "卡拉之森"], ["赫尔曼", "赛斯", "JAPAN"], ["魔界"]]
+const LAYERS := MapThemeCatalog.LAYERS
+const MONSTER_LAYERS := MapThemeCatalog.LAYERS
+const MAP_THEMES := MapThemeCatalog.THEMES
 const MONSTER_KINDS := ["弱怪池", "强怪池", "精英池", "BOSS池"]
 var monsters: Dictionary = {}
 var event_catalog: EventCatalog
 var event_data: Dictionary = {}
 var initial_cards: Array[String] = []
 var errors: PackedStringArray = []
+var themes: MapThemeCatalog
 
 func load_catalog(cards: CardCatalog, database: MonsterCatalog, monster_path := "res://data/monster_pools.txt", definition_path := "res://data/events.txt", initial_path := "res://data/initial_deck.txt") -> bool:
 	monsters.clear()
 	event_data.clear()
 	initial_cards.clear()
 	errors.clear()
+	themes = MapThemeCatalog.new()
+	if not themes.load_catalog(): errors.append_array(themes.errors)
 	event_catalog = EventCatalog.new()
 	if not event_catalog.load_catalog(definition_path): errors.append_array(event_catalog.errors)
 	event_data = event_catalog.records

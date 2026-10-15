@@ -15,6 +15,7 @@ var _empty: Label
 var _row_motion: Tween
 var _leaders: Control
 var gold_reward := 0
+var bonus_gold := 0
 var gold_claimed := false
 const GOLD_RANGES := {1: Vector2i(5, 10), 2: Vector2i(15, 25), 3: Vector2i(50, 60)}
 var _finished := false
@@ -43,7 +44,7 @@ func _ready() -> void:
 	BattleArt.label(_row.content, "Boss卡牌宝箱" if pool_id == 3 else ("精英卡牌宝箱" if pool_id == 2 else "卡牌宝箱"), Vector2(124, 10), Vector2(380, 72), 28, Color.WHITE)
 	if victory:
 		var limits: Vector2i = GOLD_RANGES[pool_id]
-		gold_reward = rng.randi_range(limits.x, limits.y)
+		gold_reward = rng.randi_range(limits.x, limits.y) + maxi(0, bonus_gold)
 		_gold_row = OriginalUiButton.make(_body, "formation", Vector2(695, 366), Vector2(530, 92), _claim_gold, "click", "res://assets/map/native")
 		_gold_row.name = "ShellReward"
 		_gold_row.art.scale = Vector2(530.0 / 194.0, 1.0)

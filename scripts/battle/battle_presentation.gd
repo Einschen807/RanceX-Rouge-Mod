@@ -209,6 +209,21 @@ func support_feedback() -> void:
 		if event == "explode" and float(entry.damage) > 0.0:
 			_damage(float(entry.damage), at)
 			await view._wait_animation(0.2)
+	while not view.battle.pending_counter_feedback.is_empty():
+		var entry: Dictionary = view.battle.pending_counter_feedback.pop_front()
+		var descriptor := effect_for(view.battle.troop.catalog.skills[BattleAbilities.COUNTER_SKILL], 0)
+		var timing := _skill_effect(descriptor, Vector2(960, 350), 1.0)
+		await view._wait_animation(float(timing.impact))
+		if float(entry.damage) > 0.0: _damage(float(entry.damage), Vector2(960, 350))
+
+func repeated_actions() -> void:
+	while not view.battle.pending_skill_repeats.is_empty():
+		var prepared := BattleAbilities.next_repeat(view.battle)
+		if prepared.is_empty():
+			view.battle.pending_skill_repeats.clear()
+			break
+		view.battle.log_message("%s 额外释放 %s" % [prepared.actor, BattleSkillLog.skill_name(view.battle, view.battle.troop.catalog.skills[prepared.id], prepared.commands)])
+		await action(prepared.actor, prepared.id, false, -1, prepared)
 
 static func command_steps(commands: Array) -> Array[Array]:
 	# One attack per step. Other commands keep their original order and run once.
@@ -273,7 +288,7 @@ func action(actor: String, id: int, enemy := false, slot: int = -1, automatic: D
 		result = automatic
 		if result.get("ok", false):
 			if relic_action: RelicEffects.notify(view.battle, actor)
-			else: view.battle.log_message("%s 自动发动 %s" % [actor, skill.name])
+			elif not result.get("followup_action", false): view.battle.log_message("%s 自动发动 %s" % [actor, BattleSkillLog.skill_name(view.battle, skill, result.commands)])
 	else:
 		result = view.battle.prepare_enemy_skill(id) if enemy else view.battle.prepare_player_skill(actor, id, slot)
 	var multi_hit := false
@@ -292,12 +307,16 @@ func action(actor: String, id: int, enemy := false, slot: int = -1, automatic: D
 			var before_enemy := view.battle.enemy_hp
 			var before_player := view.battle.player_hp
 			var feedback_before := view.battle.pending_support_feedback.size()
+			var counters_before := view.battle.pending_counter_feedback.size()
 			view.battle.apply_skill_commands("enemy" if enemy else "player", id, steps[index], index == steps.size() - 1)
 			for target_side: String in ["enemy", "player"]:
 				var dealt := (before_player - view.battle.player_hp) if target_side == "player" else (before_enemy - view.battle.enemy_hp)
 				for feedback_index: int in range(feedback_before, view.battle.pending_support_feedback.size()):
 					var feedback: Dictionary = view.battle.pending_support_feedback[feedback_index]
 					if feedback.event == "explode" and feedback.side == target_side: dealt -= float(feedback.damage)
+				if target_side == "enemy":
+					for counter_index: int in range(counters_before, view.battle.pending_counter_feedback.size()):
+						dealt -= float(view.battle.pending_counter_feedback[counter_index].damage)
 				if dealt > 0:
 					_damage(dealt, Vector2(960, 860 if target_side == "player" else 350), rate, multi_hit)
 					_sound("res://assets/audio/attack_damage.ogg")
@@ -325,6 +344,7 @@ func action(actor: String, id: int, enemy := false, slot: int = -1, automatic: D
 	await view._wait_animation(maxf(0.55 / rate, maxf(effect_tail, damage_tail)))
 	# Give native/tween processing the final frame before the next action starts.
 	if multi_hit: await get_tree().process_frame
+	if not automatic.get("followup_action", false): await repeated_actions()
 
 func _return_card(card: CardWidget) -> void:
 	if not is_instance_valid(card): return

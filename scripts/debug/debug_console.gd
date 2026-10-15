@@ -6,6 +6,7 @@ var history: Array[String] = []
 var history_index := 0
 const HELP_TEXT := """可用命令：
 help — 显示全部命令
+travel — 切换自由行军，开启后可进入当前楼层任意节点
 shop — 打开商店
 gold 数量 — 添加贝壳（正整数）
 heal 百分比 — 恢复部队最大HP的1～100%
@@ -17,6 +18,7 @@ add relic 遗物名称 — 获得指定遗物
 delet relic 遗物名称 — 删除持有遗物（也支持 delete relic）
 add card 卡牌名称 — 获得卡牌，已有卡牌增加一颗强化星
 add medal 数量 — 添加勋章（正整数）
+add curse 名称|说明 — 获得持续存在的周目诅咒，说明可省略
 """
 
 func _ready() -> void:
@@ -82,6 +84,12 @@ func run_command(command: String, context: Node = null) -> Dictionary:
 		"help":
 			message = HELP_TEXT
 			ok = true
+		"travel":
+			if not argument.is_empty(): message = "用法：travel（再次输入关闭自由行军）"
+			else:
+				var enabled: bool = get_node("/root/RunSession").toggle_travel()
+				message = "自由行军已开启：可进入当前楼层任意节点。" if enabled else "自由行军已关闭：恢复正常路线限制。"
+				ok = true
 		"shop":
 			message = get_node("/root/ShopManager").launch()
 			ok = message.begins_with("进入商店")
@@ -124,10 +132,18 @@ func run_command(command: String, context: Node = null) -> Dictionary:
 					source.add_medals(amount)
 					message = "获得勋章：%d" % amount
 					ok = true
+			elif args.size() == 2 and args[0].to_lower() == "curse":
+				var source: TroopState = context.troop if context != null else get_node("/root/BattleManager").current_troop()
+				var curse := TroopState.parse_curse(args[1])
+				if source == null: message = "部队数据加载失败。"
+				elif curse.is_empty(): message = "用法：add curse 名称|说明"
+				else:
+					ok = source.acquire_curse(curse.name, curse.description)
+					message = ("获得诅咒：" if ok else "已持有诅咒：") + curse.name
 			elif args.size() == 2 and args[0].to_lower() in ["relic", "card"]:
 				message = get_node("/root/BattleManager").grant(args[0].to_lower(), args[1].strip_edges())
 				ok = message.begins_with("获得")
-			else: message = "用法：add relic 遗物名称 / add card 卡牌名称 / add medal 正整数数量"
+			else: message = "用法：add relic 遗物名称 / add card 卡牌名称 / add medal 正整数数量 / add curse 名称|说明"
 		"delet", "delete":
 			var args := argument.split(" ", false, 1)
 			var source: TroopState = get_node("/root/BattleManager").current_troop()

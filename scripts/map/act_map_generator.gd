@@ -3,8 +3,8 @@ class_name ActMapGenerator
 ## Layered graph first; rendering never decides connectivity or room contents.
 const WIDTH := 7
 ## Intermediate rows only: start + 22 rooms + boss = 24 steps in every act.
-const LENGTHS := [22, 22, 22]
-const LEGACY_LENGTHS := [30, 28, 26]
+const LENGTHS := [22, 22, 22, 22]
+const LEGACY_LENGTHS := [30, 28, 26, 26]
 const TYPES := ["monster", "elite", "chest", "unknown", "shop", "rest", "ancient", "boss"]
 
 static func generate(run_seed: int, act: int) -> Dictionary:

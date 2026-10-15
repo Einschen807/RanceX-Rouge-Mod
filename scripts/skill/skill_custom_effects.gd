@@ -4,9 +4,13 @@ class_name SkillCustomEffects
 ## Return additional commands; base effects still execute, custom effects are added ONCE.
 ## Example: match skill_id: 9001: return [{"kind": "your_registered_command", "value": 1}]
 ## Keep actual battle mutation in the battle consumer, not in encyclopedia widgets.
+## Type 7 (能力) normally dispatches here with custom=1. Store its temporary party-wide
+## rules in BattleState so they expire with this battle, never in persistent TroopState.
 
 static func resolve(skill_id: int, _context: Dictionary) -> Array[Dictionary]:
-	return DoushinSkillEffects.resolve(skill_id, _context)
+	var commands := DesignedSkillEffects.resolve(skill_id, _context)
+	commands.append_array(DoushinSkillEffects.resolve(skill_id, _context))
+	return commands
 
 ## Ongoing support rules use the same custom switch, dispatched by skill ID.
 ## These are private rule names, never numbered effects in skills.txt.

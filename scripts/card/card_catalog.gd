@@ -6,6 +6,7 @@ const CARD_FIELDS := ["name", "identity", "portrait", "faction", "element", "gen
 const SKILL_FIELDS := ["id", "name", "action", "type", "effect_asset", "cut_in", "ap", "effect1", "value1", "effect2", "value2", "effect3", "value3", "custom", "condition", "ultimate", "ap_type", "description"]
 const FACTIONS := ["主人公", "利萨斯", "赫尔曼", "赛斯", "自由都市", "JAPAN", "其他", "亚人", "怪物", "神魔"]
 const ELEMENTS := ["无", "炎", "冰", "雷", "光", "暗"]
+const SKILL_TYPES := ["近战", "远程", "魔法", "准备", "恢复", "特殊", "能力"]
 const UPGRADE_SUFFIX := "+"
 var cards: Array[Dictionary] = []
 var by_name: Dictionary = {}
@@ -27,12 +28,13 @@ func load_catalog(card_path: String = "res://data/cards.txt", skill_path: String
 			continue
 		var s := _dictionary(SKILL_FIELDS, row)
 		var action: int = s.action
-		if s.id <= 0 or skills.has(s.id) or not (action in [1, 2, 3] or (action >= 2000 and action <= 2999)) or s.type < 1 or s.type > 6 or s.ap < 0 or s.ap_type < 1 or s.ap_type > 5 or not s.custom in [0, 1] or not s.ultimate in [0, 1]:
+		if s.id <= 0 or skills.has(s.id) or not (action in [1, 2, 3] or (action >= 2000 and action <= 2999)) or s.type < 1 or s.type > SKILL_TYPES.size() or s.ap < 0 or s.ap_type < 1 or s.ap_type > 5 or not s.custom in [0, 1] or not s.ultimate in [0, 1]:
 			errors.append("技能ID %s 重复或枚举/数值无效" % s.id)
 			continue
 		if (action == 2 or action >= 2000) and s.ap > 100:
 			errors.append("自动技能概率必须为0～100：%s" % s.name)
 		for n: int in range(1, 4):
+			if int(s["effect%d" % n]) == 49 and action != 3: errors.append("随机DOWN替身优先只能用于被动技能：%s" % s.name)
 			if not SkillBaseEffects.has_effect(s["effect%d" % n]):
 				errors.append("技能 %s 引用了未注册的基础效果" % s.name)
 			if not SkillBaseEffects.valid_value(s["effect%d" % n], s["value%d" % n]):

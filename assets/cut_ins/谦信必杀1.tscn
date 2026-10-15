@@ -1,15 +1,18 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/cut_in_card_burst_template.tscn" id="1_template"]
 [ext_resource type="Texture2D" path="res://assets/cut_ins/谦信立绘.png" id="2_portrait"]
 [ext_resource type="AudioStream" path="res://assets/cut_ins/谦信语音.ogg" id="3_voice"]
 [ext_resource type="Script" path="res://scripts/skill/上杉谦信/kenshin_bishamonten_cut_in.gd" id="4_kenshin"]
+[ext_resource type="Texture2D" path="res://assets/cards/谦信／基本.png" id="5_card_face"]
 
 [node name="KenshinCardBurst" instance=ExtResource("1_template")]
 script = ExtResource("4_kenshin")
 portrait = ExtResource("2_portrait")
 voice = ExtResource("3_voice")
-actor_name = "Lv43 上杉谦信"
+actor_name = "上杉谦信"
+preview_card_face = ExtResource("5_card_face")
+preview_card_faction = 6
 accent = Color(0.4, 0.7215686, 1, 1)
 portrait_black_matte = true
 portrait_position = Vector2(267, 7)

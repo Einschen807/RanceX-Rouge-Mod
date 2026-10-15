@@ -79,6 +79,15 @@ func resume(troop: TroopState) -> Dictionary:
 func entry_snapshot() -> Dictionary:
 	return _entry.duplicate(true)
 
+func mark_map_intro_seen(layer: int, catalog: CardCatalog) -> Error:
+	# Only presentation metadata changes; preserve the original troop, node and RNG snapshot.
+	if _entry.is_empty() or layer != int(_entry.progress.act): return ERR_INVALID_DATA
+	var entry := _entry.duplicate(true)
+	entry.progress.maps[layer]["intro_seen"] = true
+	var result := _commit(entry, catalog)
+	if result == OK: _entry = entry
+	return result
+
 func peek_entry(catalog: CardCatalog) -> Dictionary:
 	var previous_error := last_error
 	var entry := _read(SAVE_PATH, catalog)
