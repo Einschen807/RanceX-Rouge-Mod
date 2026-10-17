@@ -281,8 +281,8 @@ func _show_loot(type: int, won := true) -> void:
 
 func _rest_screen() -> void:
 	var count: int = maxi(1, int(session.pending.get("upgrade_count", 1)))
-	_dialog("休整部队", "恢复最大生命值30%%的血量，或强化%s卡牌。" % ("一张" if count == 1 else "%d张" % count), "node")
-	_action("恢复30%生命", Vector2(95, 265), func() -> void: session.heal(30); _finish_node(), Vector2(240, 62))
+	_dialog("休整部队", "恢复最大生命值30%%的血量并重置所有卡牌技能状态，或强化%s卡牌。" % ("一张" if count == 1 else "%d张" % count), "node")
+	_action("恢复30%生命", Vector2(95, 265), func() -> void: session.recover_at_rest(); _finish_node(), Vector2(240, 62))
 	_action("强化卡牌", Vector2(365, 265), _training_screen.bind(count))
 
 func _training_screen(count: int) -> void:

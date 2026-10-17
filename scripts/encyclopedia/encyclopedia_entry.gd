@@ -11,6 +11,7 @@ var visual: Control
 var caption: Label
 var held: bool = false
 var pointer_inside: bool = false
+var _keyboard_focus := false
 var feedback_count: int = 0
 var _tween: Tween
 
@@ -113,8 +114,24 @@ func _refresh() -> void:
 		return
 	if _tween != null and _tween.is_running():
 		_tween.kill()
-	var active: bool = pointer_inside or has_focus()
+	var active: bool = not disabled and (pointer_inside or (_keyboard_focus and has_focus()))
 	_tween = create_tween().set_parallel(true)
 	_tween.tween_property(visual, "scale", Vector2.ONE * (0.98 if held else (1.025 if active else 1.0)), 0.12)
 	_tween.tween_property(visual, "position:y", 2.0 if held else (-6.0 if active else 0.0), 0.12)
 	_tween.tween_property(visual, "modulate", Color(0.82, 0.82, 0.82) if held else (Color(1.16, 1.12, 1.02) if active else Color.WHITE), 0.12)
+
+func sync_feedback() -> void:
+	held = false
+	_keyboard_focus = false
+	pointer_inside = not disabled and is_visible_in_tree() and get_global_rect().has_point(get_global_mouse_position())
+	_refresh()
+
+func _input(event: InputEvent) -> void:
+	if disabled or not is_visible_in_tree(): return
+	if event is InputEventMouseMotion or event is InputEventMouseButton:
+		if _keyboard_focus:
+			_keyboard_focus = false
+			_refresh()
+	elif event.is_action_pressed("ui_focus_next") or event.is_action_pressed("ui_focus_prev") or event.is_action_pressed("ui_left") or event.is_action_pressed("ui_right") or event.is_action_pressed("ui_up") or event.is_action_pressed("ui_down") or event.is_action_pressed("ui_accept"):
+		_keyboard_focus = true
+		_refresh()

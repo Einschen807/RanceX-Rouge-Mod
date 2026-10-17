@@ -56,8 +56,9 @@ func _set_blur(amount: float) -> void:
 	vertical.set_shader_parameter("darkness", 0.57 * amount)
 
 func _set_interactive(enabled: bool) -> void:
-	for entry: Button in entries.get_children():
+	for entry: EncyclopediaEntry in entries.get_children():
 		entry.disabled = not enabled
+		entry.sync_feedback()
 	back.disabled = not enabled
 
 func _input(event: InputEvent) -> void:

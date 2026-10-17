@@ -45,6 +45,11 @@ const BONUS_NAMES := ["增加领队格子 +1", "增加领队格子 +1", "增加�
 ## Keep stable saved bonus IDs; retired choices are never displayed or acquired.
 const BONUS_IDS := [0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 12, 13, 14, 15]
 
+## "Reset card states" restores skill uses/AP costs, preserving card instance settings.
+func reset_card_states() -> void:
+	skill_runtime.reset_floor()
+	changed.emit()
+
 func add_gold(amount: int) -> void:
 	if amount <= 0: return
 	gold += amount
@@ -98,6 +103,8 @@ func rate_cap() -> float:
 func configure(database: CardCatalog, encyclopedia: bool, owned_names: Array[String] = []) -> void:
 	catalog = database
 	encyclopedia_mode = encyclopedia
+	if encyclopedia_mode:
+		for id: int in BONUS_IDS: bonuses[id] = true
 	available.clear()
 	for card: Dictionary in catalog.cards:
 		if (encyclopedia and not CardCatalog.is_upgraded(card)) or (not encyclopedia and card.name in owned_names):
@@ -248,7 +255,6 @@ func deployment_slot(display_name: String, target: int = -1) -> int:
 	if not has_card(display_name) or is_unavailable(display_name):
 		return -1
 	var faction: int = catalog.find_name(display_name).faction
-	if faction == 10 and not encyclopedia_mode and not bonuses.get(6, false): return -1
 	if target != -1: return target if is_slot_unlocked(target) else -1
 	var previous := leader_for_faction(faction)
 	if not previous.is_empty():
@@ -259,7 +265,10 @@ func deployment_slot(display_name: String, target: int = -1) -> int:
 	return -1
 
 func is_unavailable(display_name: String) -> bool:
-	return down_cards.has(display_name) or retired_characters.has(catalog.find_name(display_name).get("identity", ""))
+	return is_faction_locked(display_name) or down_cards.has(display_name) or retired_characters.has(catalog.find_name(display_name).get("identity", ""))
+
+func is_faction_locked(display_name: String) -> bool:
+	return catalog.find_name(display_name).get("faction", 0) == 10 and not bonuses.get(6, false)
 
 func move_leader(display_name: String, target: int) -> bool:
 	var source := leaders.find(display_name)
@@ -338,7 +347,7 @@ func _normalize_leaders() -> void:
 	for slot: int in range(leaders.size()):
 		var name := leaders[slot]
 		if name.is_empty(): continue
-		var god_locked: bool = not encyclopedia_mode and not bonuses.get(6, false) and catalog.find_name(name).faction == 10
+		var god_locked := is_faction_locked(name)
 		if not is_slot_unlocked(slot) or god_locked:
 			leaders[slot] = ""
 			if not god_locked: displaced.append(name)
