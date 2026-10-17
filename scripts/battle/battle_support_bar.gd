@@ -50,6 +50,7 @@ func sync() -> void:
 		node.position = support_position(i) - node.pivot_offset * (1.0 - display_scale)
 		node.get_node("Round").text = str(entry.remaining)
 		node.visible = not view.battle.information_hidden(side)
+	if side == "player": view.position_restart_beside_support(self)
 
 func _create(entry: Dictionary, support: Dictionary, at: Vector2) -> void:
 	var node := Control.new()
@@ -77,8 +78,10 @@ func _create(entry: Dictionary, support: Dictionary, at: Vector2) -> void:
 	title.name = "Title"
 	var round_at := Vector2(232 if side == "player" else 41, 40)
 	var badge := BattleArt.picture(node, "support/round_base", round_at)
+	badge.name = "RoundBadge"
 	badge.visible = support.rounds > 0
-	var number := BattleArt.number(node, "status/round_digits", round_at + Vector2(6, 4), Vector2(20, 22))
+	var number := BattleArt.number(node, "status/round_digits", round_at + Vector2(2, 2), badge.size - Vector2(4, 4), HORIZONTAL_ALIGNMENT_CENTER)
+	number.fit_height = true
 	number.name = "Round"
 	number.visible = support.rounds > 0
 	var button := Button.new()

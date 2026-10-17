@@ -11,6 +11,56 @@ var _treasure_layer: CanvasLayer
 var _treasure: TreasureRewardScreen
 var _debug_troop: TroopState
 var _relic_chest: RelicChestScreen
+var _upgrade: CardUpgradeScreen
+var _upgrade_layer: CanvasLayer
+var _upgrade_battle_mode := Node.PROCESS_MODE_INHERIT
+
+func upgrade_test_cards() -> String:
+	if is_instance_valid(active) or is_instance_valid(_upgrade) or is_instance_valid(_treasure) or is_instance_valid(_relic_chest) or is_instance_valid(get_node("/root/ShopManager").active):
+		return "upgrade test 只能在百科大全的卡牌总览部队编制界面使用。"
+	if get_node("/root/ScreenTransition").busy: return "界面切换中，请稍后再输入 upgrade test。"
+	for modal: Node in get_tree().get_nodes_in_group("modal_overlay"):
+		if modal != get_node("/root/DebugConsole").panel: return "请先关闭当前弹窗。"
+	for node: Node in get_tree().get_nodes_in_group("encyclopedia_card_overviews"):
+		if not node is TroopFormation or not node.is_visible_in_tree() or not node.can_process() or not node.troop.encyclopedia_mode or node.upgrade_selection: continue
+		if node._transitioning or node._flip_locked or is_instance_valid(node._drag_art): return "请等待当前卡牌操作结束后再输入 upgrade test。"
+		var count := 0
+		# This inventory belongs to this overview instance; battle uses the same state.
+		var upgraded: bool = not node.test_upgrades
+		for card: Dictionary in node.troop.available.duplicate():
+			if node.troop.set_card_upgraded(card.name, upgraded): count += 1
+		node.test_upgrades = upgraded
+		return "卡牌总览临时强化%s：%d张，%s。" % ["已开启" if upgraded else "已关闭", count, "可使用 battle 测试，再次输入或退出卡牌总览后恢复" if upgraded else "已恢复普通版本"]
+	return "upgrade test 只能在百科大全的卡牌总览部队编制界面使用。"
+
+func launch_upgrade(count := 1, source: TroopState = null) -> String:
+	if count <= 0: return "用法：upgrade [正整数数量]"
+	if is_instance_valid(_upgrade) or is_instance_valid(_treasure) or is_instance_valid(_relic_chest) or get_node("/root/ScreenTransition").busy: return "当前界面不能强化卡牌。"
+	if get_tree().get_first_node_in_group("modal_overlay") != null and not get_node("/root/DebugConsole").panel.visible: return "请先关闭当前弹窗。"
+	if is_instance_valid(active) and (active.input_locked or is_instance_valid(active.formation) or active.battle.phase == "result"): return "请等待当前战斗操作结束。"
+	if source == null: source = current_troop()
+	if source == null or source.available.is_empty(): return "当前没有可强化的卡牌。"
+	if is_instance_valid(active):
+		_upgrade_battle_mode = active.process_mode
+		active.process_mode = Node.PROCESS_MODE_DISABLED
+	_upgrade_layer = CanvasLayer.new()
+	_upgrade_layer.layer = 95
+	add_child(_upgrade_layer)
+	_upgrade = CardUpgradeScreen.new()
+	_upgrade.troop = source
+	_upgrade.remaining = count
+	_upgrade.completed.connect(_close_upgrade)
+	_upgrade.cancelled.connect(_close_upgrade)
+	_upgrade_layer.add_child(_upgrade)
+	return "进入卡牌强化：%d次。" % count
+
+func _close_upgrade() -> void:
+	_upgrade = null
+	if is_instance_valid(_upgrade_layer): _upgrade_layer.queue_free()
+	if is_instance_valid(active):
+		active.process_mode = _upgrade_battle_mode
+		active.battle.sync_formation(active.battle.troop.leaders.duplicate())
+		active._refresh()
 
 func launch_run_encounter(identity: String, missing_hp: float) -> String:
 	if is_instance_valid(get_node("/root/ShopManager").active): return "请先离开商店。"
@@ -36,6 +86,7 @@ func register_run(state: TroopState) -> void:
 func clear_run() -> void:
 	# Closing a suspended battle must not advance its map node or award a reward.
 	_run_node_battle = false
+	if is_instance_valid(_upgrade): _close_upgrade()
 	close()
 	if is_instance_valid(_relic_chest): _close_relic_chest()
 	if is_instance_valid(_treasure): _close_treasure()
@@ -68,7 +119,7 @@ func grant(kind: String, display_name: String) -> String:
 	if card.is_empty() or CardCatalog.is_upgraded(card): return "未找到基础卡牌：" + display_name
 	source.acquire_card(display_name)
 	if is_instance_valid(active):
-		active.battle.sync_formation()
+		active.battle.sync_formation(source.leaders.duplicate())
 		active._refresh()
 	return "获得卡牌：" + display_name
 
@@ -134,6 +185,7 @@ func _close_treasure() -> void:
 	if is_instance_valid(_treasure_layer): _treasure_layer.queue_free()
 
 func launch(identity: String) -> String:
+	if is_instance_valid(_upgrade): return "请先结束卡牌强化。"
 	if is_instance_valid(get_node("/root/ShopManager").active): return "请先离开商店。"
 	if is_instance_valid(_treasure) or is_instance_valid(_relic_chest): return "请先结束当前宝箱界面。"
 	if get_node("/root/ScreenTransition").busy: return "界面切换中，请稍后再进入战斗。"

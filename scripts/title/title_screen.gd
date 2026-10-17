@@ -135,6 +135,7 @@ func _close_relics() -> void:
 func _mount_cards() -> void:
 	encyclopedia.foreground.hide()
 	card_overview = (load("res://scenes/troop_formation.tscn") as PackedScene).instantiate() as TroopFormation
+	card_overview.add_to_group("encyclopedia_card_overviews")
 	card_overview.close_requested.connect(_close_cards)
 	add_child(card_overview)
 	card_overview.set_process_input(false)

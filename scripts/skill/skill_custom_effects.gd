@@ -12,6 +12,9 @@ static func resolve(skill_id: int, _context: Dictionary) -> Array[Dictionary]:
 	commands.append_array(DoushinSkillEffects.resolve(skill_id, _context))
 	return commands
 
+static func can_use(skill_id: int, context: Dictionary) -> bool:
+	return DesignedSkillEffects.can_use(skill_id, context)
+
 ## Ongoing support rules use the same custom switch, dispatched by skill ID.
 ## These are private rule names, never numbered effects in skills.txt.
 static func passive(skill_id: int) -> Dictionary:

@@ -6,6 +6,8 @@ var run_uses: Dictionary = {}
 var battle_uses: Dictionary = {}
 var last_turn: Dictionary = {}
 var acted: Dictionary = {}
+## Exhaustion inherited when an upgrade changes a once-only skill's AP type.
+var inherited_limits: Dictionary = {}
 var rng := RandomNumberGenerator.new()
 
 func _init() -> void:
@@ -14,11 +16,34 @@ func _init() -> void:
 func _key(actor: String, skill: Dictionary, slot: int = 0) -> String:
 	return actor + ":" + str(skill.id) + ":slot" + str(slot)
 
+func replace_card(before: Dictionary, after: Dictionary, catalog: CardCatalog) -> void:
+	if acted.has(before.name):
+		acted[after.name] = acted[before.name]
+		acted.erase(before.name)
+	# Upgrade skill IDs differ; transfer all counters by corresponding skill slot.
+	for slot: int in range(2):
+		var old_skill: Dictionary = catalog.skills.get(before["skill%d" % (slot + 1)], {})
+		var new_skill: Dictionary = catalog.skills.get(after["skill%d" % (slot + 1)], {})
+		if old_skill.is_empty() or new_skill.is_empty(): continue
+		var old_key := _key(before.name, old_skill, slot)
+		var new_key := _key(after.name, new_skill, slot)
+		var limit := int(inherited_limits.get(old_key, 0))
+		if old_skill.ap_type == 4 and int(run_uses.get(old_key, 0)) > 0: limit = 4
+		elif old_skill.ap_type == 5 and int(battle_uses.get(old_key, 0)) > 0 and limit != 4: limit = 5
+		if limit != 0: inherited_limits[new_key] = limit
+		inherited_limits.erase(old_key)
+		for counters: Dictionary in [run_uses, battle_uses, last_turn]:
+			if counters.has(old_key):
+				counters[new_key] = counters[old_key]
+				counters.erase(old_key)
+
 func begin_battle() -> void:
 	turn = 1
 	battle_uses.clear()
 	last_turn.clear()
 	acted.clear()
+	for key: String in inherited_limits.keys():
+		if int(inherited_limits[key]) == 5: inherited_limits.erase(key)
 
 func end_battle() -> void:
 	begin_battle()
@@ -29,6 +54,7 @@ func next_turn() -> void:
 
 func reset_floor() -> void:
 	run_uses.clear()
+	inherited_limits.clear()
 	begin_battle()
 
 func ap_cost(actor: String, skill: Dictionary, slot: int = 0) -> int:
@@ -43,11 +69,12 @@ func ap_cost(actor: String, skill: Dictionary, slot: int = 0) -> int:
 
 func is_spent(actor: String, skill: Dictionary, slot: int = 0) -> bool:
 	var key := _key(actor, skill, slot)
-	return (skill.ap_type == 4 and run_uses.get(key, 0) > 0) or (skill.ap_type == 5 and battle_uses.get(key, 0) > 0)
+	return inherited_limits.has(key) or (skill.ap_type == 4 and run_uses.get(key, 0) > 0) or (skill.ap_type == 5 and battle_uses.get(key, 0) > 0)
 
 func can_use(actor: String, skill: Dictionary, context: Dictionary, slot: int = 0) -> bool:
 	if skill.action == 3 or not SkillBaseEffects.condition_met(skill.condition, context):
 		return false
+	if int(skill.get("custom", 0)) == 1 and not SkillCustomEffects.can_use(int(skill.id), context): return false
 	if is_spent(actor, skill, slot):
 		return false
 	if skill.action == 1:

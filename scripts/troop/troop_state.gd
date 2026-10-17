@@ -2,6 +2,7 @@ extends RefCounted
 class_name TroopState
 ## Shared formation model. Encyclopedia creates its own state, never granting run inventory.
 signal changed
+signal card_replaced(previous: String, replacement: String)
 signal troop_leveled_up(count: int)
 signal relic_acquired(display_name: String, source_position: Vector2)
 var relics: Array[String] = []
@@ -13,6 +14,8 @@ var catalog: CardCatalog
 var available: Array[Dictionary] = []
 var leaders: Array[String] = ["", "", "", "", "", "", ""]
 var levels: Dictionary = {}
+## Instance settings are independent of the catalog version (future enchantments, etc.).
+var card_settings: Dictionary = {}
 var ox_coefficient := 5.0
 var bonuses: Dictionary = {}
 ## Persistent formation rates. Combat support/status modifiers belong to BattleState.
@@ -107,13 +110,54 @@ func configure(database: CardCatalog, encyclopedia: bool, owned_names: Array[Str
 func has_card(display_name: String) -> bool:
 	return available.any(func(c: Dictionary) -> bool: return c.name == display_name)
 
+func owned_version(display_name: String) -> String:
+	var base := display_name.trim_suffix(CardCatalog.UPGRADE_SUFFIX)
+	if has_card(base + CardCatalog.UPGRADE_SUFFIX): return base + CardCatalog.UPGRADE_SUFFIX
+	return base if has_card(base) else ""
+
 func acquire_card(display_name: String) -> void:
 	var card := catalog.find_name(display_name)
 	if card.is_empty(): return
-	if has_card(display_name): levels[display_name] = level(display_name) + 1
-	else: available.append(card)
+	var owned := owned_version(display_name)
+	if not owned.is_empty():
+		upgrade_card(owned)
+		return
+	available.append(card)
 	# Newly obtained cards remain in inventory, without deploying a leader.
 	changed.emit()
+
+func upgrade_card(display_name: String) -> bool:
+	if not has_card(display_name): return false
+	var before := catalog.find_name(display_name)
+	var after := catalog.upgrade_preview(before)
+	if after.name == before.name:
+		levels[display_name] = level(display_name) + 5
+	else:
+		return set_card_upgraded(display_name, true)
+	changed.emit()
+	return true
+
+## Version-only replacement for the encyclopedia toggle; never adds card levels.
+func set_card_upgraded(display_name: String, upgraded: bool) -> bool:
+	if not has_card(display_name): return false
+	var before := catalog.find_name(display_name)
+	var base := display_name.trim_suffix(CardCatalog.UPGRADE_SUFFIX)
+	var after := catalog.find_name(base + CardCatalog.UPGRADE_SUFFIX if upgraded else base)
+	if after.is_empty() or after.name == before.name: return false
+	# Replace in place: acquisition order, deployment and per-instance state survive.
+	available[available.find(before)] = after
+	levels[after.name] = level(before.name)
+	levels.erase(before.name)
+	for settings: Dictionary in [card_settings, down_cards]:
+		if settings.has(before.name):
+			settings[after.name] = settings[before.name]
+			settings.erase(before.name)
+	for slot: int in range(leaders.size()):
+		if leaders[slot] == before.name: leaders[slot] = after.name
+	skill_runtime.replace_card(before, after, catalog)
+	card_replaced.emit(before.name, after.name)
+	changed.emit()
+	return true
 
 func remove_relic(display_name: String) -> bool:
 	if display_name not in relics: return false
@@ -146,11 +190,12 @@ func actual(card: Dictionary, stat: String, preview_upgrades: bool = false) -> f
 	return float(display_card["base_" + stat]) * pow(1.0 + 0.12 * level(card.name), 2.5)
 
 func acquisition_gain(card: Dictionary, stat: String, preview_upgrades: bool = false) -> float:
-	var owned := has_card(card.name)
-	var next_level := level(card.name) + (1 if owned else 0)
-	var display_card := catalog.upgrade_preview(card) if preview_upgrades else card
+	var owned_name := owned_version(card.name)
+	var owned := not owned_name.is_empty()
+	var next_level := level(owned_name) + (5 if owned and CardCatalog.is_upgraded(catalog.find_name(owned_name)) else 0)
+	var display_card := catalog.upgrade_preview(card) if preview_upgrades or owned else card
 	var next_value := float(display_card["base_" + stat]) * pow(1.0 + 0.12 * next_level, 2.5)
-	return next_value - (actual(card, stat, preview_upgrades) if owned else 0.0)
+	return next_value - (actual(catalog.find_name(owned_name), stat, preview_upgrades) if owned else 0.0)
 
 func leader_for_faction(faction: int) -> String:
 	for display_name: String in leaders:

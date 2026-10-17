@@ -280,31 +280,24 @@ func _show_loot(type: int, won := true) -> void:
 	add_child(loot)
 
 func _rest_screen() -> void:
-	_dialog("休整部队", "在此恢复 30% 最大HP，或选择一张卡牌进行训练。", "node")
-	_action("休息", Vector2(125, 265), func() -> void: session.heal(30); _finish_node())
-	_action("训练", Vector2(365, 265), func() -> void: _training_screen(1))
+	var count: int = maxi(1, int(session.pending.get("upgrade_count", 1)))
+	_dialog("休整部队", "恢复最大生命值30%%的血量，或强化%s卡牌。" % ("一张" if count == 1 else "%d张" % count), "node")
+	_action("恢复30%生命", Vector2(95, 265), func() -> void: session.heal(30); _finish_node(), Vector2(240, 62))
+	_action("强化卡牌", Vector2(365, 265), _training_screen.bind(count))
 
-func _training_screen(stars: int) -> void:
-	_dialog("整备训练", "选择一张卡牌进行强化。", "training", Vector2(760, 590))
-	var scroller := ScrollContainer.new()
-	scroller.position = Vector2(65, 150)
-	scroller.size = Vector2(630, 305)
-	_modal_body.add_child(scroller)
-	var choices := VBoxContainer.new()
-	choices.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	choices.add_theme_constant_override("separation", 12)
-	scroller.add_child(choices)
-	for card: Dictionary in session.troop.available:
-		var button := Button.new()
-		button.text = "%s    ★%d → ★%d" % [card.name, session.troop.level(card.name), session.troop.level(card.name) + stars]
-		button.custom_minimum_size = Vector2(590, 56)
-		button.add_theme_font_size_override("font_size", 22)
-		button.pressed.connect(func() -> void:
-			session.train(card.name, stars)
-			if session.pending.has("event"): session.seen_events[session.pending.event] = true
-			_finish_node())
-		choices.add_child(button)
-	_action("返回", Vector2(280, 495), _show_pending)
+func _training_screen(count: int) -> void:
+	_clear_modal()
+	var screen := CardUpgradeScreen.new()
+	screen.troop = session.troop
+	screen.remaining = count
+	screen.rest_mode = true
+	screen.completed.connect(_finish_node)
+	screen.cancelled.connect(func() -> void:
+		_clear_modal()
+		_rest_screen())
+	_modal = screen
+	_modal_kind = "training"
+	add_child(screen)
 
 func _event_screen() -> void:
 	_clear_modal()
@@ -345,18 +338,17 @@ func _dialog(title: String, text: String, kind: String, dimensions := Vector2(68
 	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	panel.position = -dimensions * 0.5
 	panel.size = dimensions
-	panel.add_theme_stylebox_override("panel", FormationArt.box(Color("30291c"), Color("b69450")))
+	panel.add_theme_stylebox_override("panel", BattleArt.panel_style())
 	_modal.add_child(panel)
 	_modal_body = panel
-	var heading := FormationArt.label(panel, title, Vector2(35, 24), Vector2(dimensions.x - 70, 65), 35, GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+	var heading := FormationArt.label(panel, title, Vector2(35, 12), Vector2(dimensions.x - 70, 44), 32, GOLD, HORIZONTAL_ALIGNMENT_CENTER)
 	heading.name = "Heading"
 	var body := FormationArt.label(panel, text, Vector2(50, 110), Vector2(dimensions.x - 100, 90), 24, Color("eee2ca"), HORIZONTAL_ALIGNMENT_CENTER)
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 
 func _action(text: String, at: Vector2, callback: Callable, dimensions := Vector2(200, 62)) -> Button:
-	var button := FormationArt.button(_modal_body, text, at, dimensions, callback)
-	get_node("/root/UIAudio").bind_button(button)
-	button.grab_focus.call_deferred()
+	var button := BattleArt.text_button(_modal_body, text, at, dimensions, callback)
+	button.grab_focus()
 	return button
 
 func _clear_modal() -> void:

@@ -20,9 +20,9 @@ func _ready() -> void:
 	material = background
 	var title := _text(self, "状态", Vector2(26, 20), Vector2(340, 34), 25, Color("fff479"))
 	title.add_theme_constant_override("outline_size", 4)
-	_ability_tab = BattleArt.text_button(self, "能力", Vector2(26, 66), Vector2(162, 42), func() -> void: select_page("ability"))
+	_ability_tab = BattleArt.text_button(self, "能力", Vector2(26, 62), Vector2(162, 56), func() -> void: select_page("ability"))
 	_ability_tab.name = "AbilityTab"
-	_curse_tab = BattleArt.text_button(self, "诅咒", Vector2(204, 66), Vector2(162, 42), func() -> void: select_page("curse"))
+	_curse_tab = BattleArt.text_button(self, "诅咒", Vector2(204, 62), Vector2(162, 56), func() -> void: select_page("curse"))
 	_curse_tab.name = "CurseTab"
 	for tab: OriginalUiButton in [_ability_tab, _curse_tab]:
 		tab.content.get_child(0).add_theme_font_size_override("font_size", 21)

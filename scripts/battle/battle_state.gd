@@ -55,6 +55,8 @@ var defer_skill_repeats := false
 var resolving_skill_repeats := false
 var enemy_blocks: Array[int] = []
 var bonus_gold := 0
+## Growth earned by a lethal custom skill is committed only at battle victory.
+var pending_card_levels: Dictionary = {}
 var _lethal_skill := 0
 var animate_automatic_skills := false
 var pending_automatic_skills: Array[Dictionary] = []
@@ -76,6 +78,7 @@ var extra_resistance_rates := {"player": {"physical": 0.0, "magic": 0.0}, "enemy
 
 func configure(state: TroopState, monsters: MonsterCatalog, identity: String) -> void:
 	troop = state
+	if not troop.card_replaced.is_connected(_on_card_replaced): troop.card_replaced.connect(_on_card_replaced)
 	database = monsters
 	monster = monsters.monsters[identity]
 	runtime = troop.skill_runtime
@@ -98,6 +101,7 @@ func configure(state: TroopState, monsters: MonsterCatalog, identity: String) ->
 	pending_counter_feedback.clear()
 	enemy_blocks.clear()
 	bonus_gold = 0
+	pending_card_levels.clear()
 	_lethal_skill = 0
 	troop.down_cards.clear()
 	troop.retired_characters.clear()
@@ -125,6 +129,24 @@ func configure(state: TroopState, monsters: MonsterCatalog, identity: String) ->
 
 func ap_max() -> int:
 	return 10 if troop.bonuses.get(3, false) else 6
+
+func _on_card_replaced(previous: String, replacement: String) -> void:
+	# Keep battle references aligned without counting the replacement as a manual swap.
+	if locked_target == previous: locked_target = replacement
+	if pending_card_levels.has(previous):
+		pending_card_levels[replacement] = pending_card_levels[previous]
+		pending_card_levels.erase(previous)
+	for entry: Dictionary in support_groups.player:
+		if entry.actor == previous: entry.actor = replacement
+	if leader_powers.player.has(previous):
+		leader_powers.player[replacement] = leader_powers.player[previous]
+		leader_powers.player.erase(previous)
+	var blocked := blocked_player_actors.find(previous)
+	if blocked >= 0: blocked_player_actors[blocked] = replacement
+	for pending_skill: Dictionary in pending_automatic_skills:
+		if pending_skill.actor == previous:
+			pending_skill.actor = replacement
+			pending_skill.id = troop.catalog.find_name(replacement)["skill%d" % (int(pending_skill.slot) + 1)]
 
 func swap_interval() -> int:
 	return 1 if troop.bonuses.get(5, false) else 5
@@ -187,6 +209,14 @@ func context(side: String, card: Dictionary = {}) -> Dictionary:
 	result.gold = troop.gold
 	result.enemy_kind = int(monster.kind)
 	result.assault_bonus = float(ability_rules.assault) if side == "player" else 0.0
+	# Availability here is independent of AP affordability and skill conditions.
+	var other_actionable := 0
+	if side == "player" and not has_status("player", BattleStatusEffects.SLEEP):
+		for actor: String in troop.leaders:
+			if actor.is_empty() or actor == card.get("name", "") or troop.is_unavailable(actor): continue
+			if runtime.acted.get(actor, false) or actor in blocked_player_actors: continue
+			other_actionable += 1
+	result.other_actionable_leaders = other_actionable
 	for condition_side: String in ["player", "enemy"]:
 		var side_supports: Array[Dictionary] = []
 		for entry: Dictionary in BattleSupports.group(self, condition_side):
@@ -496,6 +526,12 @@ func _apply(side: String, skill: Dictionary, commands: Array) -> void:
 				if side == "player" and enemy_hp <= 0.0 and _lethal_skill == int(skill.id):
 					bonus_gold += int(command.amount)
 					_lethal_skill = 0
+			"devour":
+				var before_hp := enemy_hp if not player_target else player_hp
+				var lost := lose_hp(target_side, float(command.percent), command)
+				if side == "player" and not player_target and before_hp > 0.0 and lost > 0.0 and enemy_hp <= 0.0:
+					var actor := String(command.get("actor", ""))
+					if troop.has_card(actor): pending_card_levels[actor] = int(pending_card_levels.get(actor, 0)) + int(command.levels)
 			"cleanse":
 				var candidates: Array = statuses(target_side).keys()
 				candidates.erase(BattleStatusEffects.PURITY)
@@ -772,7 +808,18 @@ func _check_result() -> void:
 	if not outcome.is_empty():
 		phase = "result"
 		troop.bonus_edit_locked = true
+		if outcome == "胜利": _settle_card_levels()
 		log_message(outcome)
+
+func _settle_card_levels() -> void:
+	var rewards := pending_card_levels.duplicate()
+	# Clear before signals fire, so re-entrant result checks cannot award twice.
+	pending_card_levels.clear()
+	for actor: String in rewards:
+		if not troop.has_card(actor): continue
+		var before := troop.level(actor)
+		troop.set_level(actor, before + int(rewards[actor]))
+		log_message("%s ★级别ＵＰ：%d→%d" % [actor, before, troop.level(actor)])
 
 func log_message(message: String) -> void:
 	logs.append(message)
@@ -781,6 +828,7 @@ func log_message(message: String) -> void:
 	log_added.emit(message)
 
 func finish() -> void:
+	pending_card_levels.clear()
 	locked_target = ""
 	leader_powers = {"player": {}, "enemy": {}}
 	shields = {"player": [], "enemy": []}

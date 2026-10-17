@@ -22,6 +22,7 @@ static func capture(state: BattleState) -> Dictionary:
 	fields.ability_rules = state.ability_rules.duplicate(true)
 	fields.enemy_blocks = state.enemy_blocks.duplicate()
 	fields.bonus_gold = state.bonus_gold
+	fields.pending_card_levels = state.pending_card_levels.duplicate(true)
 	return {"version": VERSION, "troop": TroopCheckpoint.capture(state.troop), "monster": state.monster.duplicate(true), "enemy_runtime": TroopCheckpoint.capture_runtime(state.enemy_runtime), "fields": fields}
 
 static func restore(source: BattleState, data: Dictionary) -> BattleState:
@@ -35,6 +36,10 @@ static func restore(source: BattleState, data: Dictionary) -> BattleState:
 		for index: Variant in data.fields.enemy_blocks:
 			if not TroopCheckpoint._integer(index, 0): return null
 	if data.fields.has("bonus_gold") and not TroopCheckpoint._integer(data.fields.bonus_gold, 0): return null
+	if data.fields.has("pending_card_levels"):
+		if not data.fields.pending_card_levels is Dictionary: return null
+		for actor: Variant in data.fields.pending_card_levels:
+			if not actor is String or source.troop.catalog.find_name(actor).is_empty() or not TroopCheckpoint._integer(data.fields.pending_card_levels[actor], 1): return null
 	if data.fields.has("abilities"):
 		if not data.fields.abilities is Array: return null
 		for record: Variant in data.fields.abilities:
@@ -69,6 +74,7 @@ static func restore(source: BattleState, data: Dictionary) -> BattleState:
 	result.ability_rules = data.fields.get("ability_rules", BattleAbilities.fresh_rules()).duplicate(true)
 	result.enemy_blocks.assign(data.fields.get("enemy_blocks", []))
 	result.bonus_gold = int(data.fields.get("bonus_gold", 0))
+	result.pending_card_levels = data.fields.get("pending_card_levels", {}).duplicate(true)
 	result.animate_automatic_skills = source.animate_automatic_skills
 	result.entry_missing_hp = source.entry_missing_hp
 	result.troop.changed.emit()

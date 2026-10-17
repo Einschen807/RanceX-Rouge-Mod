@@ -177,7 +177,7 @@ func _refresh_mark(index: int) -> void:
 	for child: Node in mark.get_children():
 		mark.remove_child(child)
 		child.queue_free()
-	if troop.has_card(chest.offers[index].name):
+	if not troop.owned_version(chest.offers[index].name).is_empty():
 		TreasureArt.flat(mark, "duplicate")
 		var quantity := OriginalBitmapNumber.new()
 		quantity.name = "DuplicateCount"

@@ -7,6 +7,7 @@ static func _runtime(source: SkillRuntime) -> SkillRuntime:
 	copy.turn = source.turn
 	for field: String in ["run_uses", "battle_uses", "last_turn", "acted"]:
 		copy.set(field, source.get(field).duplicate(true))
+	copy.inherited_limits = source.inherited_limits.duplicate(true)
 	copy.rng.seed = source.rng.seed
 	copy.rng.state = source.rng.state
 	return copy
@@ -22,7 +23,7 @@ static func snapshot(source: BattleState) -> BattleState:
 	formation.gold = source.troop.gold
 	formation.available.assign(source.troop.available)
 	formation.leaders.assign(source.troop.leaders)
-	for field: String in ["levels", "bonuses", "damage_rates", "resistance_rates", "down_cards", "retired_characters", "pending_retired_characters"]: formation.set(field, source.troop.get(field).duplicate(true))
+	for field: String in ["levels", "card_settings", "bonuses", "damage_rates", "resistance_rates", "down_cards", "retired_characters", "pending_retired_characters"]: formation.set(field, source.troop.get(field).duplicate(true))
 	formation.battle_formation_editing = source.troop.battle_formation_editing
 	formation.ox_coefficient = source.troop.ox_coefficient
 	formation.battle_active = source.troop.battle_active
@@ -41,6 +42,7 @@ static func snapshot(source: BattleState) -> BattleState:
 	copy.pending_skill_repeats.assign(source.pending_skill_repeats.duplicate(true))
 	copy.enemy_blocks.assign(source.enemy_blocks)
 	copy.bonus_gold = source.bonus_gold
+	copy.pending_card_levels = source.pending_card_levels.duplicate(true)
 	copy.pending_enemy_skill = source.pending_enemy_skill
 	copy.pending_enemy_commands.assign(source.pending_enemy_commands.duplicate(true))
 	copy.player_statuses = source.player_statuses.duplicate(true)

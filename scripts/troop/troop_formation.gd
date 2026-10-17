@@ -2,6 +2,10 @@ extends Control
 class_name TroopFormation
 ## Encyclopedia and gameplay both instantiate this scene, passing different TroopState inventory.
 signal close_requested
+signal upgrade_selected(display_name: String)
+var upgrade_selection := false
+## Local console toggle; discarded when the encyclopedia overview is closed.
+var test_upgrades := false
 var catalog := CardCatalog.new()
 var troop := TroopState.new()
 var selected_faction := 1
@@ -56,6 +60,11 @@ func _ready() -> void:
 			return
 		troop.configure(catalog, true)
 	_build()
+	if upgrade_selection:
+		_bonus_button.disabled = true
+		_formation_button.disabled = true
+		selected_faction = int(troop.available[0].faction) if not troop.available.is_empty() else 1
+		_requested_faction = selected_faction
 	troop.changed.connect(_refresh)
 	_refresh()
 	_tabs[0].grab_focus()
@@ -267,6 +276,7 @@ func _display_name(record: Dictionary) -> String:
 func _card(record: Dictionary, is_leader: bool) -> CardWidget:
 	var widget := CardWidget.new()
 	widget.setup(record, troop, is_leader, detail_mode, preview_upgrades)
+	widget.set_meta("upgrade_selection", upgrade_selection)
 	widget.leader_selected = is_leader and record.faction == selected_faction
 	widget.card_clicked.connect(_on_card_clicked)
 	widget.leader_removed.connect(troop.remove)
@@ -274,6 +284,9 @@ func _card(record: Dictionary, is_leader: bool) -> CardWidget:
 	return widget
 
 func _on_card_clicked(display_name: String, is_leader: bool) -> void:
+	if upgrade_selection:
+		if not _transitioning and not _flip_locked: upgrade_selected.emit(display_name)
+		return
 	if is_leader:
 		get_node("/root/UIAudio").play()
 		_select_faction(catalog.find_name(display_name).faction)
@@ -562,7 +575,7 @@ func _apply_mode_view(show: bool) -> void:
 	_scrollbar.visible = not show
 	_sort_caption.visible = not show
 	_details.visible = not show
-	_upgrade_checkbox.visible = not show
+	_upgrade_checkbox.visible = not show and not upgrade_selection
 	_bonus_button.selected = show
 	_formation_button.selected = not show
 	for button: Button in _tabs + _sort_buttons:
@@ -577,13 +590,16 @@ func _preview_level(value: float) -> void:
 		troop.changed.emit()
 
 func _input(event: InputEvent) -> void:
-	if get_tree().get_first_node_in_group("modal_overlay") != null:
+	var modal := get_tree().get_first_node_in_group("modal_overlay")
+	if modal != null and not (upgrade_selection and modal == get_parent()):
 		return
 	if event.is_action_pressed("ui_cancel"):
+		if upgrade_selection: return # Upgrade flow owns Back and its confirmation dialog.
 		get_viewport().set_input_as_handled()
 		get_node("/root/UIAudio").play("cancel")
 		close_requested.emit()
 		return
+	if upgrade_selection: return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
 			if not _transitioning and not _flip_locked:

@@ -240,6 +240,29 @@ static func command_steps(commands: Array) -> Array[Array]:
 	steps.append(step)
 	return steps
 
+static func impact_steps(commands: Array) -> Array[Array]:
+	# Keep attack order and arithmetic intact, but show attached enemy HP loss separately.
+	var steps: Array[Array] = []
+	if not commands.any(func(command: Dictionary) -> bool: return command.kind == "damage"):
+		steps.append(commands)
+		return steps
+	var step: Array[Dictionary] = []
+	var has_attack := false
+	var has_loss := false
+	for command: Dictionary in commands:
+		var attack: bool = command.kind == "damage"
+		var loss: bool = command.get("target", "opponent") != "self" and (command.kind in ["lose_percent", "devour"] or (command.kind == "hp_fraction" and command.get("lose", false)))
+		if (loss and (has_attack or has_loss)) or (attack and has_loss):
+			steps.append(step)
+			step = []
+			has_attack = false
+			has_loss = false
+		step.append(command)
+		has_attack = has_attack or attack
+		has_loss = has_loss or loss
+	steps.append(step)
+	return steps
+
 func _skill_effect(descriptor: Dictionary, at: Vector2, rate: float) -> Dictionary:
 	var timing := {"impact": 0.25, "duration": 0.0}
 	if not descriptor.is_empty():
@@ -292,6 +315,7 @@ func action(actor: String, id: int, enemy := false, slot: int = -1, automatic: D
 	else:
 		result = view.battle.prepare_enemy_skill(id) if enemy else view.battle.prepare_player_skill(actor, id, slot)
 	var multi_hit := false
+	var extra_impact_delay := 0.0
 	if result.ok:
 		var steps := command_steps(result.commands)
 		multi_hit = steps.size() > 1
@@ -304,34 +328,22 @@ func action(actor: String, id: int, enemy := false, slot: int = -1, automatic: D
 				await view._wait_animation(MULTI_HIT_INTERVAL - wind_up)
 				timing = _skill_effect(descriptor, at, effect_rate)
 				await view._wait_animation(float(timing.impact) / effect_rate)
-			var before_enemy := view.battle.enemy_hp
-			var before_player := view.battle.player_hp
-			var feedback_before := view.battle.pending_support_feedback.size()
-			var counters_before := view.battle.pending_counter_feedback.size()
-			view.battle.apply_skill_commands("enemy" if enemy else "player", id, steps[index], index == steps.size() - 1)
-			for target_side: String in ["enemy", "player"]:
-				var dealt := (before_player - view.battle.player_hp) if target_side == "player" else (before_enemy - view.battle.enemy_hp)
-				for feedback_index: int in range(feedback_before, view.battle.pending_support_feedback.size()):
-					var feedback: Dictionary = view.battle.pending_support_feedback[feedback_index]
-					if feedback.event == "explode" and feedback.side == target_side: dealt -= float(feedback.damage)
-				if target_side == "enemy":
-					for counter_index: int in range(counters_before, view.battle.pending_counter_feedback.size()):
-						dealt -= float(view.battle.pending_counter_feedback[counter_index].damage)
-				if dealt > 0:
-					_damage(dealt, Vector2(960, 860 if target_side == "player" else 350), rate, multi_hit)
-					_sound("res://assets/audio/attack_damage.ogg")
-				elif dealt < 0.0 and not view.battle.information_hidden(target_side):
-					_heal(-dealt, target_side == "enemy")
-			for command: Dictionary in steps[index]:
-				if command.get("miss", false):
-					_miss(Vector2(960, 860 if enemy else 350), rate)
-			await support_feedback()
-			if index == 0:
-				# The actor returns after the first impact; remaining strikes are one action.
-				_return_card(card)
-				card = null
-				banner.hide()
-				banner.queue_free()
+				extra_impact_delay = 0.0
+			var impacts := impact_steps(steps[index])
+			for impact_index: int in range(impacts.size()):
+				if impact_index > 0:
+					# A separate HP pulse uses native damage feedback, without another attack.
+					await view._wait_animation(MULTI_HIT_INTERVAL / rate)
+					extra_impact_delay += MULTI_HIT_INTERVAL / rate
+				var finished := index == steps.size() - 1 and impact_index == impacts.size() - 1
+				_apply_impact(id, impacts[impact_index], enemy, finished, rate, multi_hit)
+				await support_feedback()
+				if index == 0 and impact_index == 0:
+					# The actor returns after the first impact; all stages remain one action.
+					_return_card(card)
+					card = null
+					banner.hide()
+					banner.queue_free()
 	else:
 		view.battle.changed.emit()
 	if not enemy and automatic.is_empty(): view.finish_ap_payment()
@@ -339,12 +351,34 @@ func action(actor: String, id: int, enemy := false, slot: int = -1, automatic: D
 	await view._wait_animation(0.12 / rate)
 	if is_instance_valid(banner): banner.queue_free()
 	# Let long effects finish before the next actor starts, preserving their native tail.
-	var effect_tail := (float(timing.duration) - float(timing.impact)) / effect_rate - 0.12 / rate
+	var effect_tail := (float(timing.duration) - float(timing.impact)) / effect_rate - extra_impact_delay - 0.12 / rate
 	var damage_tail := ((MULTI_HIT_NUMBER_TIME if multi_hit else 0.66) - 0.12) / rate
 	await view._wait_animation(maxf(0.55 / rate, maxf(effect_tail, damage_tail)))
 	# Give native/tween processing the final frame before the next action starts.
 	if multi_hit: await get_tree().process_frame
 	if not automatic.get("followup_action", false): await repeated_actions()
+
+func _apply_impact(id: int, commands: Array, enemy: bool, finished: bool, rate: float, multi_hit: bool) -> void:
+	var before_enemy := view.battle.enemy_hp
+	var before_player := view.battle.player_hp
+	var feedback_before := view.battle.pending_support_feedback.size()
+	var counters_before := view.battle.pending_counter_feedback.size()
+	view.battle.apply_skill_commands("enemy" if enemy else "player", id, commands, finished)
+	for target_side: String in ["enemy", "player"]:
+		var dealt := (before_player - view.battle.player_hp) if target_side == "player" else (before_enemy - view.battle.enemy_hp)
+		for feedback_index: int in range(feedback_before, view.battle.pending_support_feedback.size()):
+			var feedback: Dictionary = view.battle.pending_support_feedback[feedback_index]
+			if feedback.event == "explode" and feedback.side == target_side: dealt -= float(feedback.damage)
+		if target_side == "enemy":
+			for counter_index: int in range(counters_before, view.battle.pending_counter_feedback.size()):
+				dealt -= float(view.battle.pending_counter_feedback[counter_index].damage)
+		if dealt > 0:
+			_damage(dealt, Vector2(960, 860 if target_side == "player" else 350), rate, multi_hit)
+			_sound("res://assets/audio/attack_damage.ogg")
+		elif dealt < 0.0 and not view.battle.information_hidden(target_side):
+			_heal(-dealt, target_side == "enemy")
+	for command: Dictionary in commands:
+		if command.get("miss", false): _miss(Vector2(960, 860 if enemy else 350), rate)
 
 func _return_card(card: CardWidget) -> void:
 	if not is_instance_valid(card): return

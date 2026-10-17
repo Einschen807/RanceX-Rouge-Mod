@@ -170,6 +170,12 @@ func _build_view() -> void:
 func _on_log_added(message: String) -> void:
 	_log.text = message
 
+func position_restart_beside_support(bar: BattleSupportBar) -> void:
+	_restart_button.position = Vector2(1832, 16)
+	if BattleSupports.group(battle, "player").size() >= 7:
+		var seventh := bar.support_position(6)
+		_restart_button.position = seventh - Vector2(_restart_button.size.x + 12, 0)
+
 func _restart_battle() -> void:
 	if input_locked or is_instance_valid(formation): return
 	var keep_analysis := is_instance_valid(analysis_panel)
@@ -310,11 +316,13 @@ func _build() -> void:
 	_log = BattleArt.label(self, "", Vector2(324, 1048), Vector2(1140, 30), 21)
 	BattleArt.button(self, "log_closed", Vector2(1481, 1049), Vector2(150, 31), _show_logs)
 	_build_preparation()
-	var analysis := OriginalUiButton.make(self, "square", Vector2(1832, 790), Vector2(80, 80), _show_analysis)
+	var analysis := OriginalUiButton.make(self, "square", Vector2(1832, 890), Vector2(80, 80), _show_analysis)
 	_analysis_button = analysis
 	analysis.art.scale = Vector2.ONE * (80.0 / 86.0)
 	_option_icon(analysis, "help_icon", "解析")
-	_restart_button = OriginalUiButton.make(self, "square", Vector2(1744, 790), Vector2(80, 80), _restart_battle)
+	_restart_button = OriginalUiButton.make(self, "square", Vector2(1832, 16), Vector2(80, 80), _restart_battle)
+	_restart_button.name = "RestartButton"
+	_restart_button.z_index = 90
 	_restart_button.art.scale = analysis.art.scale
 	_option_icon(_restart_button, "restart_icon", "重开")
 	# Keep information controls in the former defence area, above End Turn.
@@ -428,8 +436,6 @@ func _build_preparation() -> void:
 	_formation_button = OriginalUiButton.make(_prep, "square", Vector2(1744, 990), Vector2(158, 80), _open_formation)
 	_formation_button.art.scale = Vector2(158.0 / 86.0, 1)
 	BattleArt.label(_formation_button.content, "部队编制", Vector2(5, 12), Vector2(148, 50), 25, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER)
-	BattleArt.label(_prep, "战斗结果", Vector2(1390, 330), Vector2(470, 50), 30, FormationArt.GOLD, HORIZONTAL_ALIGNMENT_RIGHT)
-	BattleArt.label(_prep, "胜利          前进\n败北          GAMEOVER\n超过时间（99 Round） GAMEOVER", Vector2(1370, 390), Vector2(500, 150), 26, Color.WHITE, HORIZONTAL_ALIGNMENT_RIGHT)
 
 func _refresh() -> void:
 	_enemy_number.text = str(int(ceil(battle.enemy_hp)))

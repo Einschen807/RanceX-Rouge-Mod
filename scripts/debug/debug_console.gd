@@ -16,7 +16,9 @@ treasure 0|1|2|3 — 打开对应类型的卡牌宝箱
 relic [遗物池名称] — 打开遗物宝箱，省略池名使用默认遗物池
 add relic 遗物名称 — 获得指定遗物
 delet relic 遗物名称 — 删除持有遗物（也支持 delete relic）
-add card 卡牌名称 — 获得卡牌，已有卡牌增加一颗强化星
+add card 卡牌名称 — 获得卡牌，首次重复强化，之后每次等级+5
+upgrade [数量] — 选择卡牌强化，默认1次
+upgrade test — 切换百科卡牌总览的全部卡牌强化，再次输入或退出总览后恢复
 add medal 数量 — 添加勋章（正整数）
 add curse 名称|说明 — 获得持续存在的周目诅咒，说明可省略
 """
@@ -78,6 +80,8 @@ func run_command(command: String, context: Node = null) -> Dictionary:
 	var split := command.split(" ", false, 1)
 	var verb := split[0].to_lower()
 	var argument := split[1].strip_edges() if split.size() == 2 else ""
+	if verb != "help" and get_tree().get_first_node_in_group("card_upgrade_screen") != null:
+		return {"ok": false, "message": "请先完成或退出当前卡牌强化。"}
 	var message := ""
 	var ok := false
 	match verb:
@@ -93,6 +97,14 @@ func run_command(command: String, context: Node = null) -> Dictionary:
 		"shop":
 			message = get_node("/root/ShopManager").launch()
 			ok = message.begins_with("进入商店")
+		"upgrade":
+			if argument.to_lower() == "test":
+				message = get_node("/root/BattleManager").upgrade_test_cards()
+				ok = message.begins_with("卡牌总览临时强化")
+			else:
+				var count := 1 if argument.is_empty() else (int(argument) if argument.is_valid_int() else 0)
+				message = get_node("/root/BattleManager").launch_upgrade(count, context.troop if context != null else null)
+				ok = message.begins_with("进入卡牌强化")
 		"battle":
 			message = get_node("/root/BattleManager").launch(argument)
 			ok = message.begins_with("进入战斗")

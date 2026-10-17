@@ -57,6 +57,8 @@ static func validate(commands: PackedStringArray, troop: TroopState, session: No
 				var pool := argument if not argument.is_empty() else "默认遗物池"
 				if not relics.pools.has(pool): return "未找到遗物池：" + pool
 				if relics.pools[pool].all(func(record: Dictionary) -> bool: return record.name in owned): return "遗物池没有可获得的遗物。"
+			"upgrade":
+				if not argument.is_empty() and (not argument.is_valid_int() or int(argument) <= 0): return "用法：upgrade [正整数数量]"
 			"shop", "help": pass
 			_: return "未知命令：" + command
 	return ""
@@ -83,7 +85,7 @@ static func execute(source: String, session: Node) -> Dictionary:
 		completed += 1
 		messages.append(result.message)
 		# Commands that open a screen finish that screen before the next command.
-		while transition.busy or is_instance_valid(battle.active) or is_instance_valid(battle._treasure) or is_instance_valid(battle._relic_chest) or is_instance_valid(shop.active) or (is_instance_valid(events.active) and events.active.session != session):
+		while transition.busy or is_instance_valid(battle.active) or is_instance_valid(battle._upgrade) or is_instance_valid(battle._treasure) or is_instance_valid(battle._relic_chest) or is_instance_valid(shop.active) or (is_instance_valid(events.active) and events.active.session != session):
 			await tree.process_frame
 			if not session.active or session.pending != pending: return {"ok": false, "message": "事件已关闭。", "completed": completed}
 	return {"ok": true, "message": "\n".join(messages), "completed": completed}

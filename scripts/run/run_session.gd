@@ -357,9 +357,7 @@ func train(name: String, stars := 1) -> void:
 	troop.set_level(name, troop.level(name) + stars)
 
 func grant_card(name: String) -> void:
-	if not troop.has_card(name) and not catalog.find_name(name).is_empty():
-		troop.available.append(catalog.find_name(name))
-		troop.changed.emit()
+	troop.acquire_card(name)
 
 func _troop_changed() -> void:
 	changed.emit()

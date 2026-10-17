@@ -62,6 +62,7 @@ func refresh_feedback() -> void:
 	visual.modulate = tint
 
 func selection_blocked() -> bool:
+	if get_meta("upgrade_selection", false): return false
 	return not leader and troop.is_unavailable(card.name)
 
 func set_leader_selected(value: bool) -> void:

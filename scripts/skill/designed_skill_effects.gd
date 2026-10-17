@@ -1,11 +1,16 @@
 extends RefCounted
 class_name DesignedSkillEffects
-## Stable skill IDs for the 2026-10-16 card designs. Never parse display descriptions.
+## Stable skill IDs for both card-design batches. Never parse display descriptions.
 const ASSAULT := [20029, 20031]
 const QUEEN := [20045, 20047]
 const COUNTER := [20061, 20063]
 const SUPPORT_SHIELD := [20073, 20075]
 const ECHO := [20076, 20078]
+const LAST_LEADER := [20156, 20158]
+
+static func can_use(id: int, context: Dictionary) -> bool:
+	if id in LAST_LEADER: return int(context.get("other_actionable_leaders", 0)) == 0
+	return true
 
 static func attack_bonus(id: int, context: Dictionary) -> float:
 	match id:
@@ -22,6 +27,16 @@ static func resolve(id: int, context: Dictionary) -> Array[Dictionary]:
 	if id in SUPPORT_SHIELD: return [{"kind": "battle_ability", "rule": "support_shield", "amount": 3 if id == 20073 else 4}]
 	if id in ECHO: return [{"kind": "next_skill_echo", "count": 1 if id == 20076 else 2}]
 	match id:
+		20143, 20151:
+			# Resolve from the pre-cast context, before the first configuration runs.
+			var supports: Array = context.get("player_supports", [])
+			if not supports.any(func(support: Dictionary) -> bool: return support.get("identity", "") == "魔法阵"):
+				return [{"kind": "support_add", "support": 30, "target": "self"}]
+		20152, 20154:
+			var statuses: Array = context.get("enemy_statuses", [])
+			if statuses.is_empty(): return [{"kind": "status", "status": BattleStatusEffects.WEAK, "rounds": 1 if id == 20152 else 2, "target": "opponent"}]
+		20161, 20163:
+			return [{"kind": "devour", "percent": 8 if id == 20161 else 10, "levels": 1, "target": "opponent"}]
 		20008: return [{"kind": "support_add", "support": 10, "target": "self"}]
 		20010: return [{"kind": "support_add", "support": 10, "target": "self"}, {"kind": "support_add", "support": 10, "target": "self"}]
 		20021, 20023, 20025, 20027: return [{"kind": "down", "selector": int(context.get("actor_slot", -1)) + 11, "target": "self"}]
