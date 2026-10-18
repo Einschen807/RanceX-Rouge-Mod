@@ -13,6 +13,7 @@ func load_catalog(catalog: CardCatalog, path := "res://data/card_pools.txt") -> 
 	for name: String in parsed.names:
 		var members: Array[Dictionary] = []
 		for card: Dictionary in catalog.cards:
+			if int(card.rarity) == 0: continue
 			if CardCatalog.is_upgraded(card): continue
 			if name == "BOSS卡池" and int(card.rarity) != 3: continue
 			members.append(card)

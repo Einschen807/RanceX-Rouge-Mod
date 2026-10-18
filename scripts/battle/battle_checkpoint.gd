@@ -15,11 +15,15 @@ static func capture(state: BattleState) -> Dictionary:
 			fields[field] = statuses
 		else: fields[field] = value.duplicate(true) if value is Array or value is Dictionary else value
 	fields.shields = state.shields.duplicate(true)
+	fields.extra_resistance_peaks = state.extra_resistance_peaks.duplicate(true)
 	fields.leader_powers = state.leader_powers.duplicate(true)
 	fields.shield_policy = state.shield_policy.duplicate(true)
 	fields.locked_target = state.locked_target
 	fields.abilities = state.abilities.duplicate(true)
 	fields.ability_rules = state.ability_rules.duplicate(true)
+	fields.center_boost_enabled = state.center_boost_enabled
+	fields.delayed_recoveries = state.delayed_recoveries.duplicate(true)
+	fields.last_friendly_skill = state.last_friendly_skill.duplicate(true)
 	fields.enemy_blocks = state.enemy_blocks.duplicate()
 	fields.bonus_gold = state.bonus_gold
 	fields.pending_card_levels = state.pending_card_levels.duplicate(true)
@@ -66,12 +70,16 @@ static func restore(source: BattleState, data: Dictionary) -> BattleState:
 		elif result.get(field) is Array: result.get(field).assign(value)
 		else: result.set(field, value.duplicate(true) if value is Dictionary else value)
 	result.preparation_checkpoint = data.duplicate(true)
+	result.extra_resistance_peaks = data.fields.get("extra_resistance_peaks", result.extra_resistance_rates).duplicate(true)
 	if data.fields.get("shields") is Dictionary: result.shields = data.fields.shields.duplicate(true)
 	if data.fields.get("leader_powers") is Dictionary: result.leader_powers = data.fields.leader_powers.duplicate(true)
 	if data.fields.get("shield_policy") is Dictionary: result.shield_policy = data.fields.shield_policy.duplicate(true)
 	result.locked_target = String(data.fields.get("locked_target", ""))
 	result.abilities.assign(data.fields.get("abilities", []).duplicate(true))
 	result.ability_rules = data.fields.get("ability_rules", BattleAbilities.fresh_rules()).duplicate(true)
+	result.center_boost_enabled = bool(data.fields.get("center_boost_enabled", false))
+	result.delayed_recoveries.assign(data.fields.get("delayed_recoveries", []).duplicate(true))
+	result.last_friendly_skill = data.fields.get("last_friendly_skill", {}).duplicate(true)
 	result.enemy_blocks.assign(data.fields.get("enemy_blocks", []))
 	result.bonus_gold = int(data.fields.get("bonus_gold", 0))
 	result.pending_card_levels = data.fields.get("pending_card_levels", {}).duplicate(true)

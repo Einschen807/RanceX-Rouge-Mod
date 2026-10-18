@@ -295,6 +295,9 @@ func action(actor: String, id: int, enemy := false, slot: int = -1, automatic: D
 	if get_node("/root/Settings").should_play_cut_in(not enemy and forecast.lethal):
 		attack_cut_in = await _play_cut_in(skill, card)
 	var attack := int(skill.type) in [1, 2, 3]
+	if not enemy and id in DesignedSkillEffects.MIMIC and not view.battle.last_friendly_skill.is_empty():
+		skill = view.battle.last_friendly_skill
+		attack = int(skill.type) in [1, 2, 3]
 	for n: int in range(1, 4):
 		if BattleStatusEffects.valid(int(skill.get("effect%d" % n, 0))) and int(skill.get("value%d" % n, 0)) in range(1, 10): attack = true
 	# Support effects belong to the acting side; offensive effects to its opponent.

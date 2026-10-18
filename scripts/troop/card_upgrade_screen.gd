@@ -75,10 +75,6 @@ func _comparison_card(state: TroopState, record: Dictionary, at: Vector2, captio
 	widget.setup(record, state, false, 2)
 	widget.set_meta("upgrade_selection", true)
 	widget.set_meta("omit_down", true)
-	for slot: int in range(2):
-		var skill: Dictionary = state.catalog.skills.get(record["skill%d" % (slot + 1)], {})
-		if not skill.is_empty():
-			widget.skill_costs[slot] = "×" if state.skill_runtime.is_spent(record.name, skill, slot) else state.skill_runtime.ap_cost(record.name, skill, slot)
 	widget.position = at
 	widget.scale = Vector2.ONE * 1.8
 	widget.mouse_filter = Control.MOUSE_FILTER_IGNORE

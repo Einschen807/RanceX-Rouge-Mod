@@ -37,6 +37,8 @@ var retired_characters: Dictionary = {}
 var battle_formation_editing := false
 var pending_retired_characters: Dictionary = {}
 var battle_active := false
+## Battle-only starting-lineup snapshot; never serialized into run inventory.
+var formation_effect_rates: Dictionary = {}
 ## Locks after Start through the result page; preparation remains editable.
 var bonus_edit_locked := false
 var skill_runtime := SkillRuntime.new()
@@ -323,6 +325,8 @@ func rate(kind: String) -> float:
 		"magic": value = float(damage_rates.magic) + all + (30.0 if bonuses.get(10, false) else 0.0)
 		"physical_resist": value = float(resistance_rates.physical)
 		"magic_resist": value = float(resistance_rates.magic)
+	var formation := formation_effect_rates if battle_active else SkillFormationEffects.collect(self)
+	value += float(formation.get(kind, 0.0))
 	return minf(value, rate_cap())
 
 func can_toggle_bonus(index: int) -> bool:

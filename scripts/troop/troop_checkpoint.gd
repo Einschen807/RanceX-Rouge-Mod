@@ -133,6 +133,7 @@ static func restore(troop: TroopState, data: Dictionary) -> bool:
 	troop.retired_characters.clear()
 	troop.clear_battle_formation_edit()
 	troop.battle_active = false
+	troop.formation_effect_rates.clear()
 	troop.bonus_edit_locked = false
 	restore_runtime(troop.skill_runtime, data.skill_runtime)
 	return true

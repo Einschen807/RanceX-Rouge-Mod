@@ -35,6 +35,7 @@ func load_catalog(card_path: String = "res://data/cards.txt", skill_path: String
 			errors.append("自动技能概率必须为0～100：%s" % s.name)
 		for n: int in range(1, 4):
 			if int(s["effect%d" % n]) == 49 and action != 3: errors.append("随机DOWN替身优先只能用于被动技能：%s" % s.name)
+			if SkillFormationEffects.STATS.has(int(s["effect%d" % n])) and (action != 3 or not String(s.condition).is_empty()): errors.append("部队编制效果只能用于无条件被动技能：%s" % s.name)
 			if not SkillBaseEffects.has_effect(s["effect%d" % n]):
 				errors.append("技能 %s 引用了未注册的基础效果" % s.name)
 			if not SkillBaseEffects.valid_value(s["effect%d" % n], s["value%d" % n]):
@@ -56,7 +57,7 @@ func load_catalog(card_path: String = "res://data/cards.txt", skill_path: String
 		if not _schema(row, CARD_FIELDS.size(), [0, 1, 2]):
 			continue
 		var c := _dictionary(CARD_FIELDS, row)
-		if c.name.is_empty() or c.identity.is_empty() or by_name.has(c.name) or c.faction < 1 or c.faction > 10 or c.element < 0 or c.element > 5 or c.gender < 1 or c.gender > 3 or c.rarity < 1 or c.rarity > 3 or c.base_hp < 0 or c.base_at < 0:
+		if c.name.is_empty() or c.identity.is_empty() or by_name.has(c.name) or c.faction < 1 or c.faction > 10 or c.element < 0 or c.element > 5 or c.gender < 1 or c.gender > 3 or c.rarity < 0 or c.rarity > 3 or c.base_hp < 0 or c.base_at < 0:
 			errors.append("卡牌 %s 显示名重复或字段无效" % c.name)
 			continue
 		for id: int in [c.skill1, c.skill2]:

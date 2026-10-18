@@ -3,7 +3,7 @@ class_name SkillIconArt
 ## Shared type icon and top-left ultimate border, independent of cut-ins or buffs.
 
 static func player(parent: Node, skill: Dictionary, at: Vector2, dimensions := Vector2(34, 34), enabled := true) -> TextureRect:
-	var kind: int = int(skill.type) if int(skill.action) == 1 else (8 if int(skill.action) == 3 else 7)
+	var kind: int = int(skill.type) if int(skill.action) == 1 else (8 if SkillFormationEffects.is_formation(skill) else 7)
 	# skill_7 remains the original automatic-action icon; type 7 has its own asset.
 	var asset := "skill_ability" if int(skill.action) == 1 and int(skill.type) == 7 else "skill_%d" % kind
 	var icon := FormationArt.picture(parent, asset, at, dimensions)

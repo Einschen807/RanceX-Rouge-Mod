@@ -27,6 +27,7 @@ static func snapshot(source: BattleState) -> BattleState:
 	formation.battle_formation_editing = source.troop.battle_formation_editing
 	formation.ox_coefficient = source.troop.ox_coefficient
 	formation.battle_active = source.troop.battle_active
+	formation.formation_effect_rates = source.troop.formation_effect_rates.duplicate(true)
 	formation.bonus_edit_locked = source.troop.bonus_edit_locked
 	formation.encyclopedia_mode = source.troop.encyclopedia_mode
 	copy.troop = formation
@@ -38,6 +39,9 @@ static func snapshot(source: BattleState) -> BattleState:
 	copy.intent = source.intent.duplicate(true)
 	copy.abilities.assign(source.abilities.duplicate(true))
 	copy.ability_rules = source.ability_rules.duplicate(true)
+	copy.center_boost_enabled = source.center_boost_enabled
+	copy.delayed_recoveries.assign(source.delayed_recoveries.duplicate(true))
+	copy.last_friendly_skill = source.last_friendly_skill.duplicate(true)
 	copy.prepared_repeats.assign(source.prepared_repeats.duplicate(true))
 	copy.pending_skill_repeats.assign(source.pending_skill_repeats.duplicate(true))
 	copy.enemy_blocks.assign(source.enemy_blocks)
@@ -50,6 +54,7 @@ static func snapshot(source: BattleState) -> BattleState:
 	copy.extra_damage_rates = source.extra_damage_rates.duplicate(true)
 	copy.received_damage_rates = source.received_damage_rates.duplicate(true)
 	copy.extra_resistance_rates = source.extra_resistance_rates.duplicate(true)
+	copy.extra_resistance_peaks = source.extra_resistance_peaks.duplicate(true)
 	copy.combat_damage_rates = source.combat_damage_rates.duplicate(true)
 	copy.support_groups = source.support_groups.duplicate(true)
 	copy.support_turns = source.support_turns.duplicate(true)

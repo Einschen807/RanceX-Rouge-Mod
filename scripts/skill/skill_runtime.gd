@@ -58,14 +58,29 @@ func reset_floor() -> void:
 	begin_battle()
 
 func ap_cost(actor: String, skill: Dictionary, slot: int = 0) -> int:
+	return _cost_for_key(_key(actor, skill, slot), skill)
+
+func _cost_for_key(key: String, skill: Dictionary) -> int:
 	if skill.action != 1:
 		return 0
-	var key := _key(actor, skill, slot)
 	match int(skill.ap_type):
 		1: return int(skill.ap) + (1 if last_turn.get(key, -1) in [turn, turn - 1] else 0)
 		2: return int(skill.ap) + int(run_uses.get(key, 0))
 		3: return int(skill.ap) + int(battle_uses.get(key, 0))
 	return int(skill.ap)
+
+## All card views read the same live state. Upgrade previews retain the source
+## counters by slot without mutating inventory or transferring runtime records.
+func display_state(actor: String, skill: Dictionary, slot: int = 0, source_skill: Dictionary = {}) -> Dictionary:
+	var source := skill if source_skill.is_empty() else source_skill
+	var key := _key(actor, source, slot)
+	var amount := _cost_for_key(key, skill)
+	var spent: bool = is_spent(actor, source, slot) or (skill.ap_type == 4 and run_uses.get(key, 0) > 0) or (skill.ap_type == 5 and battle_uses.get(key, 0) > 0)
+	var palette := "white"
+	if amount > int(skill.ap):
+		if int(skill.ap_type) in [2, 3]: palette = "purple"
+		elif int(skill.ap_type) == 1: palette = "orange"
+	return {"amount": amount, "spent": spent, "palette": palette, "text": str(amount) if skill.action == 1 else "—"}
 
 func is_spent(actor: String, skill: Dictionary, slot: int = 0) -> bool:
 	var key := _key(actor, skill, slot)

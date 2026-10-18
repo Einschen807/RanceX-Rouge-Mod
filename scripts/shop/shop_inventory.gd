@@ -6,7 +6,7 @@ const RELIC_PRICES := {1: 175, 2: 225, 3: 275, 4: 200}
 
 static func generate(troop: TroopState, rng: RandomNumberGenerator) -> Dictionary:
 	var items: Array[Dictionary] = []
-	var cards: Array = troop.catalog.cards.filter(func(c: Dictionary) -> bool: return not CardCatalog.is_upgraded(c))
+	var cards: Array = troop.catalog.cards.filter(func(c: Dictionary) -> bool: return int(c.rarity) > 0 and not CardCatalog.is_upgraded(c))
 	for i: int in range(8):
 		if cards.is_empty(): break
 		var index := rng.randi_range(0, cards.size() - 1)
@@ -75,7 +75,7 @@ static func valid(stock: Dictionary, catalog: CardCatalog) -> bool:
 		seen.append(offer.id)
 		if kind == "card":
 			var card := catalog.find_name(offer.id)
-			if card.is_empty() or CardCatalog.is_upgraded(card) or offer.base != CARD_PRICES[card.rarity] or absf(offer.variation) > 0.050001: return false
+			if card.is_empty() or int(card.rarity) == 0 or CardCatalog.is_upgraded(card) or offer.base != CARD_PRICES[card.rarity] or absf(offer.variation) > 0.050001: return false
 		else:
 			var relic: Dictionary = relics.by_name.get(offer.id, {})
 			if relic.is_empty() or offer.base != RELIC_PRICES[relic.rarity] or absf(offer.variation) > 0.150001: return false

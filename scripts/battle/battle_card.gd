@@ -100,11 +100,6 @@ func _portrait(at: Vector2, dimensions: Vector2) -> void:
 	add_child(layer)
 	var face := CardWidget.new()
 	face.setup(card, battle.troop, false, 0)
-	for slot: int in range(2):
-		var id: int = card["skill%d" % (slot + 1)]
-		if id == 0: continue
-		var skill: Dictionary = battle.troop.catalog.skills[id]
-		face.skill_costs[slot] = "已" if battle.runtime.is_spent(card.name, skill, slot) else str(battle.runtime.ap_cost(card.name, skill, slot))
 	face.portrait_only = mode == 0 or selected
 	face.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	face.set_meta("omit_down", true)
@@ -184,16 +179,22 @@ func _cost(parent: Control, skill: Dictionary, at: Vector2, slot: int) -> void:
 	cost.size = Vector2(82, 30)
 	cost.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(cost)
-	if battle.runtime.is_spent(card.name, skill, slot) or skill.action != 1:
-		var text := "已" if battle.runtime.is_spent(card.name, skill, slot) else "—"
-		BattleArt.label(cost, text, Vector2.ZERO, cost.size, 28, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER)
+	var status := battle.runtime.display_state(card.name, skill, slot)
+	if skill.action != 1:
+		BattleArt.label(cost, status.text, Vector2.ZERO, cost.size, 28, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER)
 		return
-	var amount := battle.runtime.ap_cost(card.name, skill, slot)
-	var palette := "white"
-	if skill.ap_type in [2, 3] and amount > int(skill.ap):
-		palette = "purple"
-	elif skill.ap_type == 1 and amount > int(skill.ap):
-		palette = "orange"
+	if status.spent:
+		cost.set_meta("palette", "black")
+		FormationArt.picture(cost, "ap_spent", Vector2(31, 5), Vector2(19, 19)).name = "SpentAPBadge"
+		var digits := OriginalBitmapNumber.make(cost, "digits_ap_spent", Vector2(31, 5), Vector2(19, 19), "", 0)
+		digits.name = "SpentAPNumber"
+		digits.text = str(status.amount)
+		digits.fit_height = true
+		digits.abbreviate = false
+		digits.alignment = HORIZONTAL_ALIGNMENT_CENTER
+		return
+	var amount: int = status.amount
+	var palette: String = status.palette
 	cost.set_meta("palette", palette)
 	var number := BattleArt.number(cost, "cost_" + palette, Vector2(8, 1), Vector2(42, 26))
 	number.text = str(amount)

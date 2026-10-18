@@ -351,7 +351,10 @@ func heal(percent: int) -> void:
 
 func recover_at_rest() -> void:
 	heal(30)
+
+func reset_cards_at_rest() -> void:
 	troop.reset_card_states()
+	changed.emit()
 
 func set_event_damage(value: float) -> void:
 	missing_hp = maxf(0, value)

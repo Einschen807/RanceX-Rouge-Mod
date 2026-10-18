@@ -20,6 +20,7 @@ var _requested_faction := 1
 var _requested_bonus := false
 var _requested_upgrades := false
 var _flights: Dictionary = {}
+var _return_name := ""
 var _drag_source: CardWidget
 var _drag_art: Control
 var _drag_start := Vector2.ZERO
@@ -99,7 +100,7 @@ func _build() -> void:
 	_scroll.size = Vector2(1310, 658)
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
-	_scroll.leader_removed.connect(troop.remove)
+	_scroll.leader_removed.connect(_undeploy)
 	add_child(_scroll)
 	_grid = GridContainer.new()
 	_grid.columns = 6
@@ -261,7 +262,9 @@ func _refresh_faction_cards() -> void:
 		2: cards.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return troop.actual(a, "at", preview_upgrades) > troop.actual(b, "at", preview_upgrades))
 		3: cards.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return troop.level(a.name) > troop.level(b.name))
 	for card: Dictionary in cards:
-		_grid.add_child(_card(card, false))
+		var widget := _card(card, false)
+		_grid.add_child(widget)
+		if card.name == _return_name: widget.modulate.a = 0.0
 	if cards.is_empty():
 		FormationArt.label(_grid, "此阵营暂无卡牌", Vector2.ZERO, Vector2(650, 100), 28, FormationArt.GOLD)
 	var path := "res://assets/formation/native/ground_%d/animation.json" % selected_faction
@@ -279,22 +282,62 @@ func _card(record: Dictionary, is_leader: bool) -> CardWidget:
 	widget.set_meta("upgrade_selection", upgrade_selection)
 	widget.leader_selected = is_leader and record.faction == selected_faction
 	widget.card_clicked.connect(_on_card_clicked)
-	widget.leader_removed.connect(troop.remove)
+	widget.leader_removed.connect(_undeploy)
 	widget.card_dropped.connect(_deploy)
 	return widget
 
 func _on_card_clicked(display_name: String, is_leader: bool) -> void:
+	if not _return_name.is_empty() or _transitioning or _flip_locked: return
 	if upgrade_selection:
 		if not _transitioning and not _flip_locked: upgrade_selected.emit(display_name)
 		return
 	if is_leader:
 		get_node("/root/UIAudio").play()
 		_select_faction(catalog.find_name(display_name).faction)
+	elif display_name in troop.leaders:
+		_undeploy(display_name)
 	else:
 		_deploy(display_name)
 
+func _undeploy(display_name: String, dragged_art: Control = null) -> void:
+	if not _return_name.is_empty() or _transitioning or _flip_locked: return
+	var slot := troop.leaders.find(display_name)
+	if slot < 0: return
+	var destination: CardWidget
+	for child: Node in _grid.get_children():
+		if child is CardWidget and child.card.name == display_name:
+			destination = child
+			break
+	if destination == null or not _scroll.visible:
+		if is_instance_valid(dragged_art): dragged_art.queue_free()
+		_cancel_flight(slot)
+		troop.remove(display_name)
+		return
+	var target := destination.global_position - global_position
+	var flying := dragged_art
+	if flying == null:
+		var source: Control = _flights[slot].node if _flights.has(slot) else (_leader_area.get_child(slot) as CardWidget).visual
+		flying = source.duplicate() as Control
+		flying.position = source.global_position - global_position
+		add_child(flying)
+	_cancel_flight(slot)
+	flying.modulate = Color.WHITE
+	flying.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_return_name = display_name
+	troop.remove(display_name)
+	get_node("/root/UIAudio").play("cancel")
+	var tween := create_tween()
+	tween.tween_property(flying, "position", target, 0.20).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tween.tween_callback(func() -> void:
+		_return_name = ""
+		flying.queue_free()
+		for child: Node in _grid.get_children():
+			if child is CardWidget and child.card.name == display_name:
+				child.modulate.a = 1.0
+				child.refresh_feedback())
+
 func _deploy(display_name: String) -> void:
-	if _transitioning or _flip_locked:
+	if _transitioning or _flip_locked or not _return_name.is_empty():
 		return
 	if display_name in troop.leaders:
 		return
@@ -344,7 +387,7 @@ func _card_at(point: Vector2) -> CardWidget:
 	return null
 
 func _start_drag(point: Vector2) -> void:
-	if not is_instance_valid(_drag_source) or _drag_source.selection_blocked():
+	if not _return_name.is_empty() or not is_instance_valid(_drag_source) or _drag_source.selection_blocked():
 		_drag_source = null
 		return
 	_drag_source.dragging = true
@@ -374,11 +417,10 @@ func _release_drag(point: Vector2) -> void:
 	var source_slot := troop.leaders.find(display_name)
 	# The full faction area (tabs, cards, and its empty space) unloads leaders.
 	if not bonuses_visible and Rect2(0, 339, 1542, 741).has_point(local):
-		art.queue_free()
 		if source_slot >= 0:
-			get_node("/root/UIAudio").play("cancel")
-			troop.remove(display_name)
+			_undeploy(display_name, art)
 		else:
+			art.queue_free()
 			_refresh()
 		return
 	var target := 0
@@ -442,13 +484,13 @@ func _select_faction(faction: int) -> void:
 	_request_view(faction, _requested_bonus)
 
 func _sort(mode: int) -> void:
-	if _transitioning or _drag_art != null or is_instance_valid(_drag_source):
+	if not _return_name.is_empty() or _transitioning or _drag_art != null or is_instance_valid(_drag_source):
 		return
 	sort_mode = mode
 	_refresh()
 
 func _cycle_details() -> void:
-	if _flip_locked or _transitioning or _drag_art != null:
+	if not _return_name.is_empty() or _flip_locked or _transitioning or _drag_art != null:
 		return
 	_flip_locked = true
 	detail_mode = (detail_mode + 1) % 3
@@ -466,7 +508,7 @@ func _show_bonuses(show: bool) -> void:
 	_request_view(_requested_faction, show)
 
 func _set_upgrade_preview(enabled: bool) -> void:
-	if _drag_art != null:
+	if not _return_name.is_empty() or _drag_art != null:
 		_upgrade_checkbox.set_pressed_no_signal(_requested_upgrades)
 		return
 	_upgrade_checkbox.selected = enabled
@@ -475,7 +517,7 @@ func _set_upgrade_preview(enabled: bool) -> void:
 	_request_view(_requested_faction, _requested_bonus)
 
 func _request_view(faction: int, show: bool) -> void:
-	if _drag_art != null:
+	if not _return_name.is_empty() or _drag_art != null:
 		return
 	_requested_faction = faction
 	_requested_bonus = show

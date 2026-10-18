@@ -177,17 +177,32 @@ func _skill(index: int, y: int, description: bool) -> void:
 	var icon := SkillIconArt.player(visual, s, Vector2(9, y + 1))
 	icon.name = "SkillTypeIcon%d" % (index + 1)
 	if s.action == 1:
-		var badge := FormationArt.picture(visual, "ap", Vector2(32, y), Vector2(19, 19))
+		var status := troop.skill_runtime.display_state(card.name, s, index, original)
+		var badge := FormationArt.picture(visual, "ap_spent" if status.spent else "ap", Vector2(32, y), Vector2(19, 19))
 		badge.name = "SkillCostBadge%d" % (index + 1)
-		var shown_cost := str(skill_costs.get(index, s.ap))
-		var ap := FormationArt.label(visual, shown_cost, Vector2(32, y), Vector2(19, 19), 13 if shown_cost.length() == 1 else 10, Color(0.08, 0.07, 0.04), HORIZONTAL_ALIGNMENT_CENTER)
+		var shown_cost := str(skill_costs.get(index, status.text))
+		var cost_color := Color(0.08, 0.07, 0.04)
+		if not status.spent:
+			if status.palette == "purple": cost_color = Color("8639c4")
+			elif status.palette == "orange": cost_color = Color("b76109")
+		var ap := FormationArt.label(visual, shown_cost, Vector2(32, y), Vector2(19, 19), 13 if shown_cost.length() == 1 else 10, cost_color, HORIZONTAL_ALIGNMENT_CENTER)
 		ap.name = "SkillCost%d" % (index + 1)
+		ap.set_meta("palette", status.palette)
+		ap.set_meta("spent", status.spent)
 		ap.add_theme_font_override("font", CARD_TEXT_FONT)
 		ap.add_theme_constant_override("outline_size", 0)
 		ap.add_theme_color_override("font_shadow_color", Color.TRANSPARENT)
 		ap.add_theme_constant_override("shadow_offset_x", 0)
 		ap.add_theme_constant_override("shadow_offset_y", 0)
 		ap.size = Vector2(19, 19)
+		if status.spent:
+			visual.remove_child(ap)
+			ap.queue_free()
+			var digits := _native_number("SkillCost%d" % (index + 1), "digits_ap_spent", str(status.amount), Vector2(32, y), Vector2(19, 19))
+			digits.alignment = HORIZONTAL_ALIGNMENT_CENTER
+			digits.kerning = 0
+			digits.set_meta("spent", true)
+			digits.set_meta("palette", "black")
 	var skill_name := FormationArt.label(visual, s.name, Vector2(50, y + 2), Vector2(147, 32), 18)
 	# Bind the vector face explicitly: the title's SystemFont must not replace it.
 	skill_name.add_theme_font_override("font", CARD_TEXT_FONT)

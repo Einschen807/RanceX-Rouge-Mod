@@ -7,6 +7,8 @@ const COUNTER := [20061, 20063]
 const SUPPORT_SHIELD := [20073, 20075]
 const ECHO := [20076, 20078]
 const LAST_LEADER := [20156, 20158]
+const MIMIC := [20332, 20334]
+const CENTER_BOOST := [20313, 20315]
 
 static func can_use(id: int, context: Dictionary) -> bool:
 	if id in LAST_LEADER: return int(context.get("other_actionable_leaders", 0)) == 0
@@ -14,6 +16,7 @@ static func can_use(id: int, context: Dictionary) -> bool:
 
 static func attack_bonus(id: int, context: Dictionary) -> float:
 	match id:
+		20300, 20302: return floor((float(context.get("shield_percent", 0.0)) + 0.000001) / 5.0) * (0.7 if id == 20302 else 0.5)
 		20033: return float(context.get("combo", 0)) * 0.5
 		20035: return float(context.get("combo", 0)) * 0.7
 		20084: return floor(float(context.get("gold", 0)) / 50.0)
@@ -27,6 +30,24 @@ static func resolve(id: int, context: Dictionary) -> Array[Dictionary]:
 	if id in SUPPORT_SHIELD: return [{"kind": "battle_ability", "rule": "support_shield", "amount": 3 if id == 20073 else 4}]
 	if id in ECHO: return [{"kind": "next_skill_echo", "count": 1 if id == 20076 else 2}]
 	match id:
+		20320, 20322: return [{"kind": "restore_ap", "amount": 1}]
+		20301, 20303: return [{"kind": "retain_shield"}]
+		20313, 20315: return [{"kind": "center_boost_ability"}]
+		20309, 20311:
+			var stacks := 1 if id == 20309 else 2
+			return [{"kind": "status", "status": 10, "rounds": stacks, "target": "opponent"}, {"kind": "status", "status": 19, "rounds": stacks, "target": "opponent"}, {"kind": "status", "status": 20, "rounds": stacks, "target": "opponent"}]
+		20316, 20318: return [{"kind": "down", "selector": int(context.get("actor_slot", -1)) + 11, "target": "self"}]
+		20317, 20319: return [{"kind": "delayed_recovery", "ap": 1, "shield": 5 if id == 20319 else 0}]
+		20329, 20331:
+			var multiplier: float = (3.0 if id == 20331 else 2.0) + context.get("player_supports", []).size() * (0.7 if id == 20331 else 0.5)
+			return [{"kind": "clear_all_supports"}, {"kind": "damage", "amount": float(context.get("deployed_at", 0.0)) * multiplier, "multiplier": multiplier, "element": int(context.get("element", 0)), "hit": 1}]
+		20332, 20334:
+			var previous: Dictionary = context.get("last_friendly_skill", {})
+			if previous.is_empty() or int(previous.id) in MIMIC: return [{"kind": "no_op", "effective_skill_id": 0}]
+			var copied := SkillRuntime.resolve_commands(previous, context)
+			if copied.is_empty(): copied.append({"kind": "no_op"})
+			for command: Dictionary in copied: command.effective_skill_id = int(previous.id)
+			return copied
 		20143, 20151:
 			# Resolve from the pre-cast context, before the first configuration runs.
 			var supports: Array = context.get("player_supports", [])

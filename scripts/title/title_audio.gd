@@ -23,6 +23,8 @@ func _ready() -> void:
 
 func begin_intro(timeline: OriginalFlatPlayer) -> void:
 	_timeline = timeline
+	# Keep the original sound's pitch and duration while the visual intro runs faster.
+	logo_sfx.pitch_scale = 1.0
 	intro_active = true
 	_timeline.frame_advanced.connect(_on_title_frame)
 

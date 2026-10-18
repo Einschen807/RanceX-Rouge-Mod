@@ -32,7 +32,7 @@ static func next_repeat(state: BattleState) -> Dictionary:
 	var commands := SkillRuntime.resolve_commands(skill, ctx)
 	if commands.is_empty(): commands.append({"kind": "no_op"})
 	for command: Dictionary in commands: command.echo = true
-	BattleLeaderPowers.prepare(state, "player", skill, commands)
+	BattleLeaderPowers.prepare(state, "player", state.effective_skill(skill, commands), commands)
 	state._prepare_accuracy("player", commands, skill, int(ctx.element))
 	return {"ok": true, "actor": entry.actor, "id": entry.id, "commands": commands, "ap_spent": 0, "followup_action": true}
 

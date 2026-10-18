@@ -1,5 +1,7 @@
 extends Control
 
+const INTRO_PLAYBACK_SPEED := 1.5
+
 @onready var background: OriginalFlatPlayer = $Background
 @onready var logo: OriginalFlatPlayer = $Logo
 @onready var actions: HBoxContainer = $Actions
@@ -16,6 +18,7 @@ var run_map: RunMapScreen
 var _run_error: Control
 
 func _ready() -> void:
+	logo.playback_speed = INTRO_PLAYBACK_SPEED
 	actions.modulate.a = 0.0
 	settings.modulate.a = 0.0
 	_set_buttons_enabled(false)
@@ -159,6 +162,7 @@ func _finish_intro(skipped: bool = false) -> void:
 		return
 	intro_finished = true
 	title_audio.finish_intro(skipped)
+	logo.playback_speed = 1.0
 	logo.load_animation("res://assets/title/idle/animation.json")
 	_set_buttons_enabled(true)
 	var tween: Tween = create_tween().set_parallel(true)
