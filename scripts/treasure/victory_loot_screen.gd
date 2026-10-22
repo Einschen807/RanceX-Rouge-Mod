@@ -1,5 +1,7 @@
 extends Control
 class_name VictoryLootScreen
+## WIN loot: a tall native loot panel (shells and the card chest) with the current
+## leaders along the bottom. Map chests show the same panel without leaders.
 signal completed
 var troop: TroopState
 var rng: RandomNumberGenerator
@@ -18,7 +20,19 @@ var gold_reward := 0
 var bonus_gold := 0
 var gold_claimed := false
 const GOLD_RANGES := {1: Vector2i(5, 10), 2: Vector2i(15, 25), 3: Vector2i(50, 60)}
+## Native loot panel art is 612x572. Its middle is cut out (keeping the side
+## borders and the centred emblem undistorted) for a taller, narrower panel.
+const ART := preload("res://assets/treasure/loot_panel.png")
+const ART_SIZE := Vector2(612, 572)
+const EDGE := 14.0
+const CENTRE_WIDTH := 460.0
+const PANEL_SCALE := 0.9
+const PANEL_SIZE := Vector2(EDGE * 2.0 + CENTRE_WIDTH, 572) * PANEL_SCALE
+const ROW_SIZE := Vector2(362, 92)
+const ROW_TOP := 112.0
+const LEADER_SCALE := 0.84
 var _finished := false
+var _panel_at := Vector2((1920.0 - PANEL_SIZE.x) / 2.0, 238)
 
 func _ready() -> void:
 	name = "VictoryLoot"
@@ -35,29 +49,91 @@ func _ready() -> void:
 	_body.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_body.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_body)
-	TreasureArt.picture(_body, "loot_panel", Vector2(654, 250), Vector2(612, 472))
-	BattleArt.label(_body, "搜刮", Vector2(700, 270), Vector2(520, 70), 38, FormationArt.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
-	_row = OriginalUiButton.make(_body, "formation", Vector2(695, 366), Vector2(530, 92), _open_chest, "click", "res://assets/map/native")
-	_row.name = "CardChest"
-	_row.art.scale = Vector2(530.0 / 194.0, 1.0)
-	TreasureArt.picture(_row.content, "native/gold_closed/atlas_0_1" if pool_id == 3 else "native/chest_closed/atlas_0_1", Vector2(25, 10), Vector2(80, 72))
-	BattleArt.label(_row.content, "Boss卡牌宝箱" if pool_id == 3 else ("精英卡牌宝箱" if pool_id == 2 else "卡牌宝箱"), Vector2(124, 10), Vector2(380, 72), 28, Color.WHITE)
+	_build_panel()
+	BattleArt.label(_body, "搜刮", _panel_at + Vector2(0, 22), Vector2(PANEL_SIZE.x, 64), 38, FormationArt.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+	_row = _loot_row("CardChest", "Boss卡牌宝箱" if pool_id == 3 else ("精英卡牌宝箱" if pool_id == 2 else "卡牌宝箱"), "三选一" if pool_id == 3 else "五选二", _open_chest)
+	TreasureArt.picture(_row.content, "native/gold_closed/atlas_0_1" if pool_id == 3 else "native/chest_closed/atlas_0_1", Vector2(18, 10), Vector2(80, 72))
 	if victory:
 		var limits: Vector2i = GOLD_RANGES[pool_id]
 		gold_reward = rng.randi_range(limits.x, limits.y) + maxi(0, bonus_gold)
-		_gold_row = OriginalUiButton.make(_body, "formation", Vector2(695, 366), Vector2(530, 92), _claim_gold, "click", "res://assets/map/native")
-		_gold_row.name = "ShellReward"
-		_gold_row.art.scale = Vector2(530.0 / 194.0, 1.0)
-		ShopArt.shell(_gold_row.content, Vector2(39, 14), Vector2(58, 64))
-		BattleArt.label(_gold_row.content, "%d 贝壳" % gold_reward, Vector2(124, 10), Vector2(380, 72), 28, Color.WHITE)
-	_empty = BattleArt.label(_body, "搜刮完成", Vector2(700, 390), Vector2(520, 100), 30, FormationArt.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+		_gold_row = _loot_row("ShellReward", "%d 贝壳" % gold_reward, "点击领取", _claim_gold)
+		ShopArt.shell(_gold_row.content, Vector2(30, 14), Vector2(58, 64))
+	_empty = BattleArt.label(_body, "搜刮完成", _panel_at + Vector2(0, 150), Vector2(PANEL_SIZE.x, 100), 30, FormationArt.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
 	_empty.name = "LootComplete"
 	_layout_rows(false)
-	TreasureArt.button(_body, "继续", Vector2(863, 617), _finish).name = "Continue"
+	TreasureArt.button(_body, "继续", _panel_at + Vector2((PANEL_SIZE.x - 194.0) / 2.0, PANEL_SIZE.y - 116), _finish).name = "Continue"
 	if not pools.load_catalog(troop.catalog):
 		_row.disabled = true
-		BattleArt.label(_body, "卡池数据加载失败", Vector2(700, 610), Vector2(520, 70), 26, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER)
+		BattleArt.label(_body, "卡池数据加载失败", _panel_at + Vector2(0, 340), Vector2(PANEL_SIZE.x, 60), 24, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER)
 		push_error("\n".join(pools.errors))
+	_play_entrance()
+
+## Left border + centre slice + right border of the native panel, scaled together.
+func _build_panel() -> void:
+	var panel := Control.new()
+	panel.name = "LootPanel"
+	panel.position = _panel_at
+	panel.scale = Vector2.ONE * PANEL_SCALE
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_body.add_child(panel)
+	var centre_x := (ART_SIZE.x - CENTRE_WIDTH) / 2.0
+	var pieces := [
+		[Rect2(0, 0, EDGE, ART_SIZE.y), 0.0],
+		[Rect2(centre_x, 0, CENTRE_WIDTH, ART_SIZE.y), EDGE],
+		[Rect2(ART_SIZE.x - EDGE, 0, EDGE, ART_SIZE.y), EDGE + CENTRE_WIDTH],
+	]
+	for piece: Array in pieces:
+		var region: Rect2 = piece[0]
+		var atlas := AtlasTexture.new()
+		atlas.atlas = ART
+		atlas.region = region
+		var slice := TextureRect.new()
+		slice.texture = atlas
+		slice.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		slice.position = Vector2(float(piece[1]), 0)
+		slice.size = region.size
+		slice.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		panel.add_child(slice)
+
+func _row_target(index: int) -> Vector2:
+	return _panel_at + Vector2((PANEL_SIZE.x - ROW_SIZE.x) / 2.0, ROW_TOP + 108 * index)
+
+func _loot_row(node_name: String, title: String, hint: String, callback: Callable) -> OriginalUiButton:
+	var row := OriginalUiButton.make(_body, "formation", _row_target(0), ROW_SIZE, callback, "click", "res://assets/map/native")
+	row.name = node_name
+	row.art.scale = Vector2(ROW_SIZE.x / 194.0, 1.0)
+	BattleArt.label(row.content, title, Vector2(108, 8), Vector2(ROW_SIZE.x - 124, 44), 26, Color.WHITE)
+	var sub := BattleArt.label(row.content, hint, Vector2(110, 46), Vector2(ROW_SIZE.x - 124, 30), 19, Color("e8d9b5"))
+	sub.name = "Hint"
+	return row
+
+func _play_entrance() -> void:
+	# The panel fades in, rows slide in one after another, leaders rise from the bottom.
+	var tween := create_tween().set_parallel(true)
+	for item: CanvasItem in _body.get_children():
+		if item == _row or item == _gold_row: continue
+		item.modulate.a = 0.0
+		tween.tween_property(item, "modulate:a", 1.0, 0.3).set_delay(0.08)
+	var order := 0
+	for row: OriginalUiButton in [_gold_row, _row]:
+		if not is_instance_valid(row) or not row.visible: continue
+		var x := row.position.x
+		row.modulate.a = 0.0
+		row.position.x += 40
+		tween.tween_property(row, "modulate:a", 1.0, 0.25).set_delay(0.22 + order * 0.1)
+		tween.tween_property(row, "position:x", x, 0.3).set_delay(0.22 + order * 0.1).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		order += 1
+	if is_instance_valid(_leaders):
+		var n := 0
+		for card: Node in _leaders.get_children():
+			var item := card as Control
+			if item == null: continue
+			var y := item.position.y
+			item.position.y += 80
+			item.modulate.a = 0.0
+			tween.tween_property(item, "position:y", y, 0.35).set_delay(0.2 + n * 0.05).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+			tween.tween_property(item, "modulate:a", 1.0, 0.3).set_delay(0.2 + n * 0.05)
+			n += 1
 
 func _build_leaders() -> void:
 	if not is_instance_valid(_leaders):
@@ -66,12 +142,17 @@ func _build_leaders() -> void:
 		_leaders.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(_leaders)
 	else: BattleArt.clear(_leaders)
+	# Slightly smaller leaders leave room for the taller loot panel above them.
+	var step := 218.0 * LEADER_SCALE
+	var left := (1920.0 - (troop.leaders.size() - 1) * step - 208.0 * LEADER_SCALE) / 2.0
 	for index: int in range(troop.leaders.size()):
-		var at := Vector2(200 + 218 * index, 730)
+		var at := Vector2(left + step * index, 790)
 		var card_name: String = troop.leaders[index]
+		var slot: Control
 		if card_name.is_empty():
-			if troop.is_slot_unlocked(index): BattleArt.picture(_leaders, "card_frame", at - Vector2(2, 2))
-			else: FormationArt.picture(_leaders, "locked", at, Vector2(208, 312))
+			if troop.is_slot_unlocked(index): slot = BattleArt.picture(_leaders, "card_frame", at - Vector2(2, 2) * LEADER_SCALE)
+			else: slot = FormationArt.picture(_leaders, "locked", at, Vector2(208, 312))
+			slot.scale = Vector2.ONE * LEADER_SCALE
 			continue
 		var card := CardWidget.new()
 		card.name = "Leader%d" % index
@@ -80,6 +161,7 @@ func _build_leaders() -> void:
 		card.focus_mode = Control.FOCUS_NONE
 		card.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		card.position = at
+		card.scale = Vector2.ONE * LEADER_SCALE
 		card.set_meta("omit_unavailable", true)
 		_leaders.add_child(card)
 		for decoration: String in ["LeaderBadge", "LeaderGlow"]:
@@ -95,7 +177,7 @@ func _layout_rows(animated := true) -> void:
 	_row.visible = chest == null or not chest.claimed
 	if _row.visible: remaining.append(_row)
 	for index: int in range(remaining.size()):
-		var target := Vector2(695, 366 + 112 * index)
+		var target := _row_target(index)
 		if animated:
 			_row_motion.tween_property(remaining[index], "position", target, 0.18).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 		else: remaining[index].position = target

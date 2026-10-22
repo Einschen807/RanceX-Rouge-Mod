@@ -214,7 +214,7 @@ func support_feedback() -> void:
 			await view._wait_animation(0.2)
 	while not view.battle.pending_counter_feedback.is_empty():
 		var entry: Dictionary = view.battle.pending_counter_feedback.pop_front()
-		var descriptor := effect_for(view.battle.troop.catalog.skills[BattleAbilities.COUNTER_SKILL], 0)
+		var descriptor := effect_for(view.battle.troop.catalog.skills[int(entry.get("skill", BattleAbilities.COUNTER_SKILL))], 0)
 		var timing := _skill_effect(descriptor, Vector2(960, 350), 1.0)
 		await view._wait_animation(float(timing.impact))
 		if float(entry.damage) > 0.0: _damage(float(entry.damage), Vector2(960, 350))

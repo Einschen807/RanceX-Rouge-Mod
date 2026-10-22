@@ -316,7 +316,7 @@ func _build() -> void:
 	_log = BattleArt.label(self, "", Vector2(324, 1048), Vector2(1140, 30), 21)
 	BattleArt.button(self, "log_closed", Vector2(1481, 1049), Vector2(150, 31), _show_logs)
 	_build_preparation()
-	var analysis := OriginalUiButton.make(self, "square", Vector2(1832, 890), Vector2(80, 80), _show_analysis)
+	var analysis := OriginalUiButton.make(self, "square", Vector2(1747, 856), Vector2(80, 80), _show_analysis)
 	_analysis_button = analysis
 	analysis.art.scale = Vector2.ONE * (80.0 / 86.0)
 	_option_icon(analysis, "help_icon", "解析")
@@ -325,7 +325,8 @@ func _build() -> void:
 	_restart_button.z_index = 90
 	_restart_button.art.scale = analysis.art.scale
 	_option_icon(_restart_button, "restart_icon", "重开")
-	# Keep information controls in the former defence area, above End Turn.
+	# Information controls sit above End Turn, centred in the right-hand panel (x 1743-1920):
+	# 解析 on the left, 状态 on the right.
 	_state_button = BattleStateButton.create(self, _show_state_panel)
 	# MENU stays above the preparation shade and warning artwork in every phase.
 	var menu := OriginalUiButton.make(self, "square", Vector2(20, 990), Vector2(160, 80), func() -> void: get_node("/root/Settings").open())
@@ -513,6 +514,8 @@ func _mount_victory_loot() -> void:
 	loot.bonus_gold = battle.bonus_gold
 	loot.pool_id = reward_pool
 	loot.rng = get_node("/root/RunAutosave").rng
+	# The battle's restart control floats above everything; it does not belong on the loot page.
+	_restart_button.hide()
 	loot.completed.connect(func() -> void: close_requested.emit())
 	_result = loot
 	add_child(loot)

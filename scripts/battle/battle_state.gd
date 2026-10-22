@@ -568,7 +568,9 @@ func _apply(side: String, skill: Dictionary, commands: Array) -> void:
 				else: enemy_damage_total += amount
 				_log_damage(target_side, amount)
 				if amount > 0.0: remove_status(target_side, BattleStatusEffects.SLEEP)
-				if side == "enemy" and player_target and player_hp < hp_before and int(skill.type) in [1, 2, 3]: BattleAbilities.counter(self)
+				if side == "enemy" and player_target and player_hp < hp_before and int(skill.type) in [1, 2, 3]:
+					BattleAbilities.counter(self)
+					RelicEffects.player_damaged(self)
 			"battle_ability":
 				ability_rules[String(command.rule)] += command.amount
 			"next_skill_echo":
@@ -638,7 +640,8 @@ func _apply(side: String, skill: Dictionary, commands: Array) -> void:
 			"support_remove":
 				BattleSupports.dispel(self, target_side, command)
 			"shield":
-				BattleShields.add(self, String(command.side), float(command.percent), command.get("options", {}))
+				var shield_percent := float(command.percent) + (RelicEffects.shield_bonus(self, command) if side == "player" else 0.0)
+				BattleShields.add(self, String(command.side), shield_percent, command.get("options", {}))
 			"leader_power":
 				BattleLeaderPowers.grant(self, target_side, String(command.power), int(command.selector), int(command.get("actor_slot", -1)))
 			"buff":

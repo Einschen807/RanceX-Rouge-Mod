@@ -2,14 +2,19 @@ extends RefCounted
 class_name RelicEffects
 ## Execution follows inventory order, also the left-to-right HUD order.
 ## Persistent counters shown on the HUD. Most advance per player turn; AP_SPENT ones advance per AP paid.
-const PERIODS := {"加奈美忍法帖": 6, "3段喷射发动机": 3, "飞马": 10}
+const PERIODS := {"加奈美忍法帖": 6, "3段喷射发动机": 3, "飞马": 10, "瓦古奖章": 10}
 const AP_SPENT := ["飞马"]
 ## Skill 0 means the native AP+1 recovery handled in execute().
-const SKILLS := {"加奈美忍法帖": 9800, "妖怪宝具": 9801, "郁金香2号": 9802, "郁金香兵": 9803, "郁金香3号": 9804, "平实柠檬": 9805, "赫尔曼石墙": 9806, "守护神": 9807, "塔罗柯发动机": 0, "利萨斯的旗帜": 9808, "赫尔曼的旗帜": 9809}
+const SKILLS := {"加奈美忍法帖": 9800, "妖怪宝具": 9801, "郁金香2号": 9802, "郁金香兵": 9803, "郁金香3号": 9804, "平实柠檬": 9805, "赫尔曼石墙": 9806, "守护神": 9807, "塔罗柯发动机": 0, "利萨斯的旗帜": 9808, "赫尔曼的旗帜": 9809, "男人的友情": 9810, "医学全集": 9811, "雷伊奖章": 9812, "希尔琪奖章": 9813, "瓦古奖章": 9814}
 ## Fired once at the start of round 1.
-const BATTLE_START := ["郁金香2号", "平实柠檬", "赫尔曼石墙", "塔罗柯发动机", "守护神"]
+const BATTLE_START := ["郁金香2号", "平实柠檬", "赫尔曼石墙", "塔罗柯发动机", "守护神", "医学全集"]
 ## Fired when the player ends the given round, before the enemy turn begins.
 const TURN_END_ROUNDS := {"郁金香3号": 7}
+## 希尔琪奖章: fired at every player turn end while the shield reaches this percent of max HP.
+const HILCHI_SHIELD := 10.0
+## 侍从铠甲: extra shield percent on every player skill shield grant (not relics or supports).
+const SQUIRE_SHIELD := 1.0
+const MALE := 1
 
 static func shop_discount(troop: TroopState) -> float:
 	return 0.5 if "邦奥佩塔之证Ａ" in troop.relics else 1.0
@@ -27,6 +32,8 @@ static func turn_start(state: BattleState) -> void:
 			triggered = state.troop.relic_counters[name] == 0
 		elif name in ["妖怪宝具", "郁金香兵", "利萨斯的旗帜", "赫尔曼的旗帜"]:
 			triggered = true
+		elif name == "男人的友情":
+			triggered = all_male(state.troop)
 		elif name in BATTLE_START and state.round == 1:
 			triggered = true
 		if triggered:
@@ -105,9 +112,42 @@ static func acquired(troop: TroopState, name: String) -> void:
 static func turn_end(state: BattleState) -> void:
 	var actions: Array[Dictionary] = []
 	for name: String in state.troop.relics:
-		if TURN_END_ROUNDS.get(name, -1) == state.round:
-			actions.append({"name": name, "id": int(SKILLS.get(name, 0))})
+		var triggered: bool = TURN_END_ROUNDS.get(name, -1) == state.round
+		if name == "希尔琪奖章": triggered = BattleShields.percent(state, "player") + 0.000001 >= HILCHI_SHIELD
+		if triggered: actions.append({"name": name, "id": int(SKILLS.get(name, 0))})
 	_dispatch(state, actions)
+
+## 男人的友情: every deployed leader, DOWN ones included, must be male.
+static func all_male(troop: TroopState) -> bool:
+	var found := false
+	for name: String in troop.leaders:
+		if name.is_empty(): continue
+		if int(troop.catalog.find_name(name).get("gender", 0)) != MALE: return false
+		found = true
+	return found
+
+## 侍从铠甲: skill shields only; relic and support shields get no bonus.
+static func shield_bonus(state: BattleState, command: Dictionary) -> float:
+	if String(command.get("side", "")) != "player" or float(command.get("percent", 0.0)) <= 0.0: return 0.0
+	if command.get("relic_source", false) or command.get("support_source", false) or "侍从铠甲" not in state.troop.relics: return 0.0
+	notify(state, "侍从铠甲")
+	return SQUIRE_SHIELD
+
+## 雷伊奖章: each enemy hit that gets past the shield answers at once with a melee attack,
+## also during the enemy turn; feedback shares the 招架反击 queue.
+static func player_damaged(state: BattleState) -> void:
+	if "雷伊奖章" not in state.troop.relics or state.player_hp <= 0.0 or state.enemy_hp <= 0.0: return
+	var skill: Dictionary = state.troop.catalog.skills[SKILLS["雷伊奖章"]]
+	var commands := SkillRuntime.resolve_commands(skill, _context(state, "雷伊奖章", skill))
+	if commands.is_empty(): return
+	for command: Dictionary in commands: command.relic_source = true
+	state._prepare_accuracy("player", commands, skill, 0)
+	var before := state.enemy_hp
+	notify(state, "雷伊奖章")
+	state._apply("player", skill, commands)
+	state.pending_counter_feedback.append({"damage": maxf(0.0, before - state.enemy_hp), "skill": int(skill.id)})
+	BattleSupports.after_action(state, "player")
+	state._check_result()
 
 static func _dispatch(state: BattleState, actions: Array[Dictionary]) -> void:
 	if state.animate_automatic_skills:
@@ -121,20 +161,23 @@ static func prepare(state: BattleState, entry: Dictionary) -> Dictionary:
 	if state.phase != "player" or not state.troop.catalog.skills.has(entry.id): return {"ok": false}
 	var skill: Dictionary = state.troop.catalog.skills[entry.id]
 	if BattleSupports.attack_blocked(state, "player", skill): return {"ok": false}
+	var result := state.runtime.use_skill("relic:" + String(entry.name), skill, _context(state, entry.name, skill))
+	if result.get("ok", false):
+		result.relic_action = true
+		for command: Dictionary in result.commands: command.relic_source = true
+		state._prepare_accuracy("player", result.commands, skill, 0)
+	return result
+
+static func _context(state: BattleState, name: String, skill: Dictionary) -> Dictionary:
 	var ctx := state.context("player")
-	ctx.actor = entry.name
+	ctx.actor = name
 	ctx.actor_identity = ""
 	ctx.actor_slot = -1
 	ctx.element = 0
 	ctx.ignore_ap = true
 	ctx.allow_multiple_actions = true
 	ctx.auto_trigger = skill.action
-	var result := state.runtime.use_skill("relic:" + String(entry.name), skill, ctx)
-	if result.get("ok", false):
-		result.relic_action = true
-		for command: Dictionary in result.commands: command.relic_source = true
-		state._prepare_accuracy("player", result.commands, skill, 0)
-	return result
+	return ctx
 
 static func notify(state: BattleState, name: String) -> void:
 	state.log_message("遗物发动：" + name)

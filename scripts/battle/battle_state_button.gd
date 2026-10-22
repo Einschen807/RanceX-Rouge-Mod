@@ -18,7 +18,7 @@ static func create(parent: Node, callback: Callable) -> BattleStateButton:
 	var button := BattleStateButton.new()
 	button.name = "StateButton"
 	button.kind = "square"
-	button.position = Vector2(1744, 890)
+	button.position = Vector2(1835, 856)
 	button.size = Vector2(80, 80)
 	button.pressed.connect(callback)
 	parent.add_child(button)

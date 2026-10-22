@@ -19,7 +19,6 @@ var _details: OriginalUiButton
 var _upgrade_checkbox: OriginalUiButton
 var detail_mode := 0
 var preview_upgrades := false
-var _status: Label
 var _busy := true
 var _done := false
 var _confirming := false
@@ -50,7 +49,7 @@ func _ready() -> void:
 	panel.name = "TreasurePanel"
 	var chest_at := panel_at + Vector2(345, 315) * factor
 	var opening := TreasureArt.flat(_body, "gold_open" if chest.pool_id == 3 else "chest_open", chest_at - Vector2(656, 575) * factor)
-	opening.playback_speed = 1.40
+	opening.playback_speed = 1.65
 	opening.scale = Vector2.ONE * factor
 	TreasureArt.sound(self, "chest_open")
 	for i: int in range(chest.offers.size()):
@@ -84,7 +83,7 @@ func _ready() -> void:
 		backs[i].hide()
 		# Native entry includes the descent from y=-500 and two side-on turns.
 		var arrival := TreasureArt.flat(slot, "common", Vector2(104, 156), false)
-		arrival.playback_speed = 1.65
+		arrival.playback_speed = 2.2
 		arrival.z_index = 3
 		arrival.hide()
 		arrival_effects.append(arrival)
@@ -108,7 +107,6 @@ func _ready() -> void:
 		hover.hide()
 		hover_frames.append(hover)
 		if i in chest.selected: slot.hide()
-	_status = BattleArt.label(_body, "最多领取 %d 张卡牌" % chest.limit, panel_at + Vector2(25, panel_size.y - 112), Vector2(440 * factor, 30), 23, FormationArt.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
 	_continue = TreasureArt.button(_body, "继续", panel_at + panel_size - Vector2(216, 4) * factor, _finish)
 	_continue.scale = Vector2.ONE * factor
 	_continue.size.y = 78
@@ -198,19 +196,19 @@ func _reveal() -> void:
 	_reveals_left = cards.size() - chest.selected.size()
 	_backs_left = _reveals_left
 	await _present_reveal_frame()
-	await get_tree().create_timer(0.55).timeout
+	await get_tree().create_timer(0.38).timeout
 	if serial != _serial: return
 	for i: int in range(cards.size()):
 		if i in chest.selected: continue
 		_turn_back(i, serial)
-		await get_tree().create_timer(0.07).timeout
+		await get_tree().create_timer(0.05).timeout
 		if serial != _serial: return
 	while _backs_left > 0:
 		await get_tree().process_frame
 		if serial != _serial: return
 	# Every remaining card back must be drawn at full width before any face reveal.
 	await _present_reveal_frame()
-	await get_tree().create_timer(0.10).timeout
+	await get_tree().create_timer(0.06).timeout
 	if serial != _serial: return
 	for rarity: int in [1, 2, 3]:
 		var group: Array[int] = []
@@ -254,7 +252,7 @@ func _turn_back(index: int, serial: int) -> void:
 func _show_rarity_group(indices: Array[int], serial: int) -> void:
 	var tween := create_tween().set_parallel(true)
 	for index: int in indices:
-		tween.tween_property(backs[index], "scale:x", 0.0, 0.16).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		tween.tween_property(backs[index], "scale:x", 0.0, 0.12).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	await tween.finished
 	if serial != _serial: return
 	tween = create_tween().set_parallel(true)
@@ -262,7 +260,7 @@ func _show_rarity_group(indices: Array[int], serial: int) -> void:
 		backs[index].hide()
 		cards[index].visual.scale.x = 0.0
 		cards[index].show()
-		tween.tween_property(cards[index].visual, "scale:x", 1.0, 0.18).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		tween.tween_property(cards[index].visual, "scale:x", 1.0, 0.13).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	await tween.finished
 	if serial != _serial: return
 	for index: int in indices:
@@ -285,9 +283,9 @@ func _take(index: int) -> void:
 	slot.z_index = 6
 	cards[index].visual.modulate = Color.WHITE
 	var tween := create_tween().set_parallel(true)
-	tween.tween_property(slot, "position", Vector2(960, 540) - slot.size * 0.5, 0.30).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	tween.tween_property(slot, "scale", Vector2.ONE, 0.30).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	tween.tween_method(_set_interface_alpha, 1.0, 0.0, 0.18).set_trans(Tween.TRANS_SINE)
+	tween.tween_property(slot, "position", Vector2(960, 540) - slot.size * 0.5, 0.22).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_property(slot, "scale", Vector2.ONE, 0.22).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_method(_set_interface_alpha, 1.0, 0.0, 0.14).set_trans(Tween.TRANS_SINE)
 	await tween.finished
 	_body.hide()
 	# Low-opacity warm edge light replaces the original whole-screen white flash.
@@ -304,17 +302,17 @@ func _take(index: int) -> void:
 	slot.add_child(halo)
 	TreasureArt.sound(self, "card_get")
 	tween = create_tween()
-	tween.tween_property(halo, "modulate:a", 1.0, 0.22).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	tween.tween_property(halo, "modulate:a", 0.0, 0.28).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_property(halo, "modulate:a", 1.0, 0.16).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_property(halo, "modulate:a", 0.0, 0.2).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	await tween.finished
 	tween = create_tween()
-	tween.tween_property(slot, "modulate:a", 0.0, 0.18)
+	tween.tween_property(slot, "modulate:a", 0.0, 0.13)
 	await tween.finished
 	slot.hide()
 	halo.queue_free()
 	_body.show()
 	tween = create_tween()
-	tween.tween_method(_set_interface_alpha, 0.0, 1.0, 0.16).set_trans(Tween.TRANS_SINE)
+	tween.tween_method(_set_interface_alpha, 0.0, 1.0, 0.12).set_trans(Tween.TRANS_SINE)
 	await tween.finished
 	_confirming = false
 	_set_busy(false)
@@ -330,7 +328,6 @@ func _set_busy(value: bool) -> void:
 	_continue.disabled = value
 	_details.disabled = value
 	_upgrade_checkbox.disabled = value
-	_status.text = "已领取 %d / %d" % [chest.selected.size(), chest.limit]
 	for i: int in range(cards.size()):
 		cards[i].disabled = value or i in chest.selected
 
