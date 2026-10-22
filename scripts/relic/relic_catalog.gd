@@ -1,6 +1,7 @@
 extends RefCounted
 class_name RelicCatalog
-const RARITIES := ["普通", "罕见", "稀有", "商店"]
+## 5 特殊: obtained only through dedicated commands or events, never drawn from a pool.
+const RARITIES := ["普通", "罕见", "稀有", "商店", "特殊"]
 var entries: Array[Dictionary] = []
 var by_name: Dictionary = {}
 var pools: Dictionary = {}
@@ -20,16 +21,17 @@ func load_catalog(path := "res://data/relics.txt", pool_path := "res://data/reli
 		if row.size() != 4 or not row[0] is String or not row[1] is String or not RecordTable.integer(row[2]) or not row[3] is String:
 			errors.append("遗物记录应为名称、图标、稀有度、描述")
 			continue
-		if row[0].is_empty() or by_name.has(row[0]) or int(row[2]) not in [1, 2, 3, 4] or not ResourceLoader.exists("res://assets/relics/%s.png" % row[1]):
+		if row[0].is_empty() or by_name.has(row[0]) or int(row[2]) not in [1, 2, 3, 4, 5] or not ResourceLoader.exists("res://assets/relics/%s.png" % row[1]):
 			errors.append("遗物名称、稀有度或图标无效：" + row[0])
 			continue
-		var record := {"name": row[0], "icon": row[1], "rarity": int(row[2]), "description": row[3]}
+		# Same convention as skill descriptions: a lowercase r is a line break.
+		var record := {"name": row[0], "icon": row[1], "rarity": int(row[2]), "description": String(row[3]).replace("r", "\n")}
 		entries.append(record)
 		by_name[record.name] = record
 	var names := RecordTable.pool_names(pool_path)
 	if not names.error.is_empty(): errors.append(names.error)
 	for pool: String in names.names:
-		pools[pool] = entries.filter(func(r: Dictionary) -> bool: return r.rarity == 4 if pool == "商店遗物池" else r.rarity != 4)
+		pools[pool] = entries.filter(func(r: Dictionary) -> bool: return r.rarity == 4 if pool == "商店遗物池" else r.rarity in [1, 2, 3])
 	if not pools.has("默认遗物池"): errors.append("缺少默认遗物池")
 	if not errors.is_empty():
 		entries.clear()

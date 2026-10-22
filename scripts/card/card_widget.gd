@@ -65,6 +65,10 @@ func selection_blocked() -> bool:
 	if get_meta("upgrade_selection", false): return false
 	return not leader and troop.is_unavailable(card.name)
 
+## Upgrade selection keeps these cards clickable so the screen can explain why they are refused.
+func upgrade_exhausted() -> bool:
+	return get_meta("upgrade_selection", false) and troop.catalog.upgrade_preview(card).name == card.name
+
 func set_leader_selected(value: bool) -> void:
 	leader_selected = value
 	if visual == null:
@@ -80,7 +84,7 @@ func redraw() -> void:
 		child.queue_free()
 	FormationArt.picture(visual, "back_%d" % display_card.faction, Vector2.ZERO, size)
 	var portrait := TextureRect.new()
-	portrait.texture = load("res://assets/cards/%s.png" % display_card.portrait)
+	portrait.texture = load(CardCatalog.portrait_path(display_card))
 	portrait.size = size
 	portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	visual.add_child(portrait)
@@ -137,7 +141,7 @@ func redraw() -> void:
 			visual.add_child(badge)
 	refresh_feedback()
 	_down_art()
-	if selection_blocked() and not get_meta("omit_unavailable", false):
+	if (selection_blocked() or upgrade_exhausted()) and not get_meta("omit_unavailable", false):
 		var shade := ColorRect.new()
 		shade.name = "UnavailableShade"
 		shade.size = size

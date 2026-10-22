@@ -17,7 +17,8 @@ var next_support_uid := 1
 var pending_support_skills: Array[Dictionary] = []
 var pending_support_feedback: Array[Dictionary] = []
 var enemy_down := false
-var locked_target := ""
+var locked_targets: Array[String] = []
+var doushin_target_count := 1
 var preparation_checkpoint: Dictionary = {}
 var pending_down_replacements: Array[Dictionary] = []
 var troop: TroopState
@@ -49,6 +50,8 @@ var logs: Array[String] = []
 var abilities: Array[Dictionary] = []
 var ability_rules := BattleAbilities.fresh_rules()
 var center_boost_enabled := false
+## 赛斯的旗帜 has already extended a status this battle.
+var seth_flag_used := false
 var delayed_recoveries: Array[Dictionary] = []
 var last_friendly_skill: Dictionary = {}
 var prepared_repeats: Array[Dictionary] = []
@@ -83,6 +86,7 @@ var extra_resistance_peaks := {"player": {"physical": 0.0, "magic": 0.0}, "enemy
 func configure(state: TroopState, monsters: MonsterCatalog, identity: String) -> void:
 	troop = state
 	if not troop.card_replaced.is_connected(_on_card_replaced): troop.card_replaced.connect(_on_card_replaced)
+	if not troop.relic_acquired.is_connected(_on_relic_acquired): troop.relic_acquired.connect(_on_relic_acquired)
 	database = monsters
 	monster = monsters.monsters[identity]
 	runtime = troop.skill_runtime
@@ -91,6 +95,7 @@ func configure(state: TroopState, monsters: MonsterCatalog, identity: String) ->
 	support_groups = {"player": [], "enemy": []}
 	support_turns = {"player": 0, "enemy": 0}
 	leader_powers = {"player": {}, "enemy": {}}
+	seth_flag_used = false
 	shields = {"player": [], "enemy": []}
 	shield_policy = {"player": {"duration_turns": 1, "decay_percent": -1.0, "prevent_decay": false}, "enemy": {"duration_turns": 1, "decay_percent": -1.0, "prevent_decay": false}}
 	next_support_uid = 1
@@ -117,7 +122,8 @@ func configure(state: TroopState, monsters: MonsterCatalog, identity: String) ->
 	troop.formation_effect_rates.clear()
 	troop.bonus_edit_locked = false
 	enemy_down = false
-	locked_target = ""
+	locked_targets.clear()
+	doushin_target_count = 1
 	player_statuses.clear()
 	enemy_statuses.clear()
 	blocked_player_actors.clear()
@@ -139,9 +145,15 @@ func configure(state: TroopState, monsters: MonsterCatalog, identity: String) ->
 func ap_max() -> int:
 	return 10 if troop.bonuses.get(3, false) else 6
 
+func _on_relic_acquired(display_name: String, _at: Vector2) -> void:
+	if display_name != "中元茶泡饭" or phase == "result": return
+	if entry_missing_hp > 0.0: entry_missing_hp = 0.0
+	player_hp = player_max_hp
+	changed.emit()
+
 func _on_card_replaced(previous: String, replacement: String) -> void:
 	# Keep battle references aligned without counting the replacement as a manual swap.
-	if locked_target == previous: locked_target = replacement
+	if previous in locked_targets: locked_targets[locked_targets.find(previous)] = replacement
 	if pending_card_levels.has(previous):
 		pending_card_levels[replacement] = pending_card_levels[previous]
 		pending_card_levels.erase(previous)
@@ -216,6 +228,7 @@ func context(side: String, card: Dictionary = {}) -> Dictionary:
 	for entry: Dictionary in BattleSupports.group(self, side): supports.append(BattleSupports.definition(self, entry).identity)
 	var result := {"ap": ap, "combo": combo, "round": round, "hp": player_hp if side == "player" else enemy_hp, "hp_max": player_max_hp if side == "player" else enemy_max_hp, "player_hp": player_hp, "player_hp_max": player_max_hp, "enemy_hp": enemy_hp, "enemy_hp_max": enemy_max_hp, "deployed_at": at, "element": card.get("element", 0) if side == "player" else monster.get("element", 0), "actor": card.get("name", "") if side == "player" else monster.identity, "actor_identity": card.get("identity", "") if side == "player" else monster.identity, "actor_slot": troop.leaders.find(card.get("name", "")) if side == "player" and not card.is_empty() else (0 if side == "enemy" else -1), "auto_trigger": 2, "supports": supports}
 	# Conditions name absolute battle sides, regardless of the acting skill's side.
+	result.doushin_unacted_count = BattleDoushinTargets.unacted_count(self)
 	result.gold = troop.gold
 	result.shield_percent = BattleShields.percent(self, side)
 	result.last_friendly_skill = last_friendly_skill
@@ -269,6 +282,7 @@ func prepare_player_skill(name: String, id: int, slot: int = -1) -> Dictionary:
 	if not result.ok:
 		return result
 	ap -= result.ap_spent
+	RelicEffects.ap_spent(self, int(result.ap_spent))
 	player_has_acted = true
 	if swap_was_available:
 		next_swap_round = round + swap_interval()
@@ -371,6 +385,8 @@ func finish_enemy_turn() -> void:
 		phase = "result"
 		changed.emit()
 		return
+	if BattleDoushinTargets.has(self, "enemy", BattleDoushinTargets.LOCK):
+		BattleDoushinTargets.reaim(self)
 	round += 1
 	runtime.next_turn()
 	enemy_runtime.next_turn()
@@ -394,6 +410,7 @@ func _turn_start() -> void:
 	if phase != "result": BattleSupports.begin_turn(self, "player")
 	if phase == "player": RelicEffects.turn_start(self)
 	if phase == "player":
+		BattleLeaderPowers.roll_rates(self)
 		if center_boost_enabled:
 			BattleLeaderPowers.grant(self, "player", "boost", 11 + floori(troop.leaders.size() / 2.0), -1)
 		for recovery: Dictionary in delayed_recoveries.duplicate():
@@ -499,7 +516,11 @@ func damage_breakdown(side: String, skill: Dictionary, command: Dictionary) -> D
 	# Read the live count before this impact increments it: later hits benefit too.
 	if side == "player" and not self_target: additional_damage += combo * 0.1
 	var damage := maxf(0.0, base_damage) * maxf(0.0, 1.0 + additional_damage) * maxf(0.0, 1.0 - base_resistance / 100.0) * maxf(0.0, 1.0 - additional_resistance / 100.0)
-	var breaker: bool = String(command.get("actor_identity", "")) in ["兰斯", "健太郎"] and not command.get("support_source", false)
+	# One damage command is one hit, including each hit of a multi-hit skill.
+	var cap := int(monster.get("damage_cap", 0))
+	if target_side == "enemy" and cap > 0:
+		damage = minf(damage, enemy_max_hp * cap / 100.0)
+	var breaker: bool = RelicEffects.can_break_barrier(self, side, command)
 	return {"base_damage": base_damage, "extra_damage_rate": additional_damage * 100.0, "base_resistance": base_resistance, "extra_resistance": additional_resistance, "unblocked_damage": damage, "damage": 0.0 if not breaker and not BattleSupports.effects(self, target_side, BattleSupports.BARRIER).is_empty() else damage}
 
 func _apply(side: String, skill: Dictionary, commands: Array) -> void:
@@ -519,6 +540,8 @@ func _apply(side: String, skill: Dictionary, commands: Array) -> void:
 				for entry: Dictionary in support_groups[side].duplicate(): BattleSupports.remove(self, side, int(entry.uid))
 			"doushin_target":
 				BattleDoushinTargets.roll(self)
+			"doushin_strengthen":
+				BattleDoushinTargets.strengthen(self)
 			"doushin_reaim":
 				BattleDoushinTargets.reaim(self)
 			"damage":
@@ -611,7 +634,7 @@ func _apply(side: String, skill: Dictionary, commands: Array) -> void:
 			"down":
 				down_leaders(side, int(command.selector), int(command.get("actor_slot", -1)))
 			"support_add":
-				BattleSupports.add(self, target_side, int(command.support), String(command.get("actor", "")))
+				BattleSupports.add(self, target_side, int(command.support), String(command.get("actor", "")), int(command.get("stacks", 1)))
 			"support_remove":
 				BattleSupports.dispel(self, target_side, command)
 			"shield":
@@ -632,7 +655,7 @@ func _apply(side: String, skill: Dictionary, commands: Array) -> void:
 					# One-shot channel modifiers are kept separate from support definitions.
 					combat_damage_rates[target_side][command.stat] += float(command.amount)
 			"status":
-				add_status(target_side, int(command.status), int(command.rounds))
+				apply_status(side, target_side, int(command.status), int(command.rounds))
 
 func additional_resistance_rate(side: String, channel: String) -> float:
 	var total := float(extra_resistance_rates[side][channel])
@@ -746,6 +769,15 @@ func has_status(side: String, id: int) -> bool:
 func information_hidden(side: String) -> bool:
 	return has_status(side, BattleStatusEffects.INFORMATION_BLOCK)
 
+## Status applied by one side's effect; relic modifiers depend on the source.
+func apply_status(source_side: String, target_side: String, id: int, rounds: int) -> bool:
+	var bonus := RelicEffects.status_bonus(self, source_side)
+	if not add_status(target_side, id, rounds + bonus): return false
+	if bonus > 0:
+		seth_flag_used = true
+		RelicEffects.notify(self, "赛斯的旗帜")
+	return true
+
 func add_status(side: String, id: int, rounds: int) -> bool:
 	if not BattleStatusEffects.valid(id) or rounds <= 0: return false
 	var group := statuses(side)
@@ -764,7 +796,7 @@ func add_status(side: String, id: int, rounds: int) -> bool:
 		if group[BattleStatusEffects.PURITY] <= 0: remove_status(side, BattleStatusEffects.PURITY)
 		else: status_event.emit(side, BattleStatusEffects.PURITY, "updated")
 		return false
-	if not group.has(id) and group.size() >= BattleStatusEffects.MAX_TYPES:
+	if not group.has(id) and group.size() >= RelicEffects.status_capacity(self, side):
 		log_message("%s异常栏已满，未附加%s" % ["联合部队" if side == "player" else monster.name, BattleStatusEffects.effect_name(id)])
 		return false
 	group[id] = mini(BattleStatusEffects.MAX_ROUNDS, int(group.get(id, 0)) + rounds)
@@ -880,7 +912,8 @@ func log_message(message: String) -> void:
 func finish() -> void:
 	troop.formation_effect_rates.clear()
 	pending_card_levels.clear()
-	locked_target = ""
+	locked_targets.clear()
+	doushin_target_count = 1
 	leader_powers = {"player": {}, "enemy": {}}
 	shields = {"player": [], "enemy": []}
 	troop.battle_active = false

@@ -163,6 +163,15 @@ func _banner(actor: String, skill: Dictionary, enemy: bool, support := false, re
 	return banner
 
 func automatic_actions() -> void:
+	await relic_actions()
+	await support_actions("player")
+	while not view.battle.pending_automatic_skills.is_empty() and view.battle.phase == "player":
+		var entry: Dictionary = view.battle.pending_automatic_skills.pop_front()
+		var prepared := view.battle.prepare_automatic_skill(entry.actor, entry.id, entry.slot)
+		if prepared.get("ok", false): await action(entry.actor, entry.id, false, entry.slot, prepared)
+	view.battle.pending_automatic_skills.clear()
+
+func relic_actions() -> void:
 	while not view.battle.pending_relic_actions.is_empty() and view.battle.phase == "player":
 		var entry: Dictionary = view.battle.pending_relic_actions.pop_front()
 		if entry.id == 0:
@@ -171,12 +180,6 @@ func automatic_actions() -> void:
 		var prepared := RelicEffects.prepare(view.battle, entry)
 		if prepared.get("ok", false): await action(entry.name, entry.id, false, -1, prepared)
 	view.battle.pending_relic_actions.clear()
-	await support_actions("player")
-	while not view.battle.pending_automatic_skills.is_empty() and view.battle.phase == "player":
-		var entry: Dictionary = view.battle.pending_automatic_skills.pop_front()
-		var prepared := view.battle.prepare_automatic_skill(entry.actor, entry.id, entry.slot)
-		if prepared.get("ok", false): await action(entry.actor, entry.id, false, entry.slot, prepared)
-	view.battle.pending_automatic_skills.clear()
 
 func support_actions(side: String) -> void:
 	while not view.battle.pending_support_skills.is_empty() and view.battle.phase == side:

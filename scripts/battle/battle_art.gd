@@ -1,6 +1,6 @@
 extends RefCounted
 class_name BattleArt
-const INFORMATION_PANEL_SCALE := Vector2(0.8, 0.8)
+const INFORMATION_PANEL_SCALE := Vector2(0.9, 0.9)
 
 static func picture(parent: Node, asset: String, at: Vector2, dimensions: Vector2 = Vector2.ZERO) -> TextureRect:
 	var node := TextureRect.new()

@@ -799,6 +799,14 @@ func _end_turn() -> void:
 	if input_locked or battle.phase != "player":
 		return
 	input_locked = true
+	RelicEffects.turn_end(battle)
+	await _presentation.relic_actions()
+	await _presentation.status_feedback()
+	if not is_inside_tree(): return
+	if battle.phase != "player":
+		input_locked = false
+		_refresh()
+		return
 	battle.begin_enemy_turn()
 	await _presentation.status_feedback()
 	selected_card = ""
@@ -919,8 +927,10 @@ func _show_analysis() -> void:
 	var monster: Dictionary = battle.monster
 	_analysis_text(frame, "MonsterName", monster.name, Vector2(26, 20), Vector2(340, 34), 25, Color("fff479"), 4)
 	_analysis_text(frame, "MonsterKind", ["普通怪", "精英怪", "BOSS"][monster.kind - 1], Vector2(26, 62), Vector2(340, 32), 23, Color("fff479"), 4)
-	_analysis_text(frame, "Stats", "基础 AT\n物理抗性\n魔法抗性", Vector2(26, 116), Vector2(140, 96), 21)
-	_analysis_text(frame, "Values", "%d\n%d%%\n%d%%" % [monster.base_at, monster.physical_resist, monster.magic_resist], Vector2(170, 116), Vector2(194, 96), 21)
+	_analysis_text(frame, "Stats", "基础 AT\n物理抗性\n魔法抗性\n限伤", Vector2(26, 116), Vector2(140, 124), 21)
+	var cap := int(monster.get("damage_cap", 0))
+	var cap_text := "%d%%" % cap if cap > 0 else "不限伤"
+	_analysis_text(frame, "Values", "%d\n%d%%\n%d%%\n%s" % [monster.base_at, monster.physical_resist, monster.magic_resist, cap_text], Vector2(170, 116), Vector2(194, 124), 21)
 	var description := _analysis_text(frame, "Description", monster.analysis, Vector2(26, 246), Vector2(340, 114), 19)
 	description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	description.vertical_alignment = VERTICAL_ALIGNMENT_TOP

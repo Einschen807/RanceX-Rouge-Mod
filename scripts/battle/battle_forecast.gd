@@ -51,6 +51,7 @@ static func snapshot(source: BattleState) -> BattleState:
 	copy.pending_enemy_commands.assign(source.pending_enemy_commands.duplicate(true))
 	copy.player_statuses = source.player_statuses.duplicate(true)
 	copy.enemy_statuses = source.enemy_statuses.duplicate(true)
+	copy.seth_flag_used = source.seth_flag_used
 	copy.extra_damage_rates = source.extra_damage_rates.duplicate(true)
 	copy.received_damage_rates = source.received_damage_rates.duplicate(true)
 	copy.extra_resistance_rates = source.extra_resistance_rates.duplicate(true)
@@ -64,7 +65,8 @@ static func snapshot(source: BattleState) -> BattleState:
 	copy.next_support_uid = source.next_support_uid
 	copy.pending_support_skills.assign(source.pending_support_skills.duplicate(true))
 	copy.enemy_down = source.enemy_down
-	copy.locked_target = source.locked_target
+	copy.locked_targets.assign(source.locked_targets)
+	copy.doushin_target_count = source.doushin_target_count
 	copy.pending_down_replacements.assign(source.pending_down_replacements.duplicate(true))
 	copy.blocked_player_actors.assign(source.blocked_player_actors)
 	copy.animate_automatic_skills = true

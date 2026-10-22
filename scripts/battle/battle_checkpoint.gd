@@ -18,7 +18,8 @@ static func capture(state: BattleState) -> Dictionary:
 	fields.extra_resistance_peaks = state.extra_resistance_peaks.duplicate(true)
 	fields.leader_powers = state.leader_powers.duplicate(true)
 	fields.shield_policy = state.shield_policy.duplicate(true)
-	fields.locked_target = state.locked_target
+	fields.locked_targets = state.locked_targets.duplicate()
+	fields.doushin_target_count = state.doushin_target_count
 	fields.abilities = state.abilities.duplicate(true)
 	fields.ability_rules = state.ability_rules.duplicate(true)
 	fields.center_boost_enabled = state.center_boost_enabled
@@ -74,7 +75,8 @@ static func restore(source: BattleState, data: Dictionary) -> BattleState:
 	if data.fields.get("shields") is Dictionary: result.shields = data.fields.shields.duplicate(true)
 	if data.fields.get("leader_powers") is Dictionary: result.leader_powers = data.fields.leader_powers.duplicate(true)
 	if data.fields.get("shield_policy") is Dictionary: result.shield_policy = data.fields.shield_policy.duplicate(true)
-	result.locked_target = String(data.fields.get("locked_target", ""))
+	result.locked_targets.assign(data.fields.get("locked_targets", []))
+	result.doushin_target_count = int(data.fields.get("doushin_target_count", 1))
 	result.abilities.assign(data.fields.get("abilities", []).duplicate(true))
 	result.ability_rules = data.fields.get("ability_rules", BattleAbilities.fresh_rules()).duplicate(true)
 	result.center_boost_enabled = bool(data.fields.get("center_boost_enabled", false))

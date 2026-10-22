@@ -32,14 +32,20 @@ static func add(state: BattleState, side: String, value: float, options: Diction
 static func begin_turn(state: BattleState, side: String) -> void:
 	if state.shield_policy[side].get("prevent_decay", false): return
 	var before := amount(state, side)
+	var expired := 0.0
 	for layer: Dictionary in state.shields[side].duplicate():
 		if int(layer.duration_turns) == 0: continue
 		layer.remaining_turns -= 1
 		if int(layer.remaining_turns) > 0: continue
-		if float(layer.decay_percent) < 0.0: layer.amount = 0.0
+		if float(layer.decay_percent) < 0.0:
+			expired += float(layer.amount)
+			layer.amount = 0.0
 		else: layer.amount = maxf(0.0, float(layer.amount) - maximum(state, side) * float(layer.decay_percent) / 100.0)
 		layer.remaining_turns = layer.duration_turns
 		if float(layer.amount) <= 0.0: state.shields[side].erase(layer)
+	# 冰箱 carries part of the expiring shield into the new turn as a one-turn layer.
+	var kept := minf(expired, RelicEffects.fridge_carry(state, side))
+	if kept > 0.0: state.shields[side].append({"amount": kept, "remaining_turns": 1, "duration_turns": 1, "decay_percent": -1.0})
 	if amount(state, side) < before: state.shield_event.emit(side, "decay")
 
 ## Spend the earliest expiration first; return the damage that reaches real HP.

@@ -2,7 +2,8 @@ extends RefCounted
 class_name CardCatalog
 ## One file for every card and one for every skill; never instantiate one scene per character.
 
-const CARD_FIELDS := ["name", "identity", "portrait", "faction", "element", "gender", "skill1", "skill2", "base_hp", "base_at", "rarity"]
+const CARD_FIELDS := ["name", "identity", "portrait", "faction", "element", "gender", "skill1", "skill2", "base_hp", "base_at", "rarity", "nude"]
+const CENSORED_PORTRAIT := "res://assets/formation/censored_portrait.png"
 const SKILL_FIELDS := ["id", "name", "action", "type", "effect_asset", "cut_in", "ap", "effect1", "value1", "effect2", "value2", "effect3", "value3", "custom", "condition", "ultimate", "ap_type", "description"]
 const FACTIONS := ["主人公", "利萨斯", "赫尔曼", "赛斯", "自由都市", "JAPAN", "其他", "亚人", "怪物", "神魔"]
 const ELEMENTS := ["无", "炎", "冰", "雷", "光", "暗"]
@@ -57,7 +58,7 @@ func load_catalog(card_path: String = "res://data/cards.txt", skill_path: String
 		if not _schema(row, CARD_FIELDS.size(), [0, 1, 2]):
 			continue
 		var c := _dictionary(CARD_FIELDS, row)
-		if c.name.is_empty() or c.identity.is_empty() or by_name.has(c.name) or c.faction < 1 or c.faction > 10 or c.element < 0 or c.element > 5 or c.gender < 1 or c.gender > 3 or c.rarity < 0 or c.rarity > 3 or c.base_hp < 0 or c.base_at < 0:
+		if c.name.is_empty() or c.identity.is_empty() or by_name.has(c.name) or c.faction < 1 or c.faction > 10 or c.element < 0 or c.element > 5 or c.gender < 1 or c.gender > 3 or c.rarity < 0 or c.rarity > 3 or c.base_hp < 0 or c.base_at < 0 or c.nude not in [0, 1]:
 			errors.append("卡牌 %s 显示名重复或字段无效" % c.name)
 			continue
 		for id: int in [c.skill1, c.skill2]:
@@ -89,6 +90,13 @@ func find_name(display_name: String) -> Dictionary:
 
 func find_identity(identity: String) -> Array:
 	return by_identity.get(identity, [])
+
+## Nude cards show a censored face while the shared harmony-mode setting is on.
+static func portrait_path(card: Dictionary) -> String:
+	if int(card.get("nude", 0)) == 1:
+		var settings := (Engine.get_main_loop() as SceneTree).root.get_node_or_null("Settings")
+		if settings != null and settings.harmony_mode(): return CENSORED_PORTRAIT
+	return "res://assets/cards/%s.png" % card.portrait
 
 static func is_upgraded(card: Dictionary) -> bool:
 	return String(card.name).ends_with(UPGRADE_SUFFIX)

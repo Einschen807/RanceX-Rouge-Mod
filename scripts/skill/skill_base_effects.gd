@@ -39,6 +39,7 @@ static func resolve(skill: Dictionary, context: Dictionary) -> Array[Dictionary]
 			var multiplier := value / 100.0
 			if String(skill.get("name", "")).contains("突击"): multiplier += float(context.get("assault_bonus", 0.0))
 			if int(skill.get("custom", 0)) == 1: multiplier += DesignedSkillEffects.attack_bonus(int(skill.id), context)
+			if int(skill.get("custom", 0)) == 1: multiplier += DoushinSkillEffects.attack_bonus(int(skill.id), context)
 			# Combo repeats only attack commands. Other numbered effects execute once.
 			for hit: int in range(hits):
 				commands.append({"kind": "damage", "amount": float(context.get("deployed_at", 0.0)) * multiplier, "multiplier": multiplier, "hit": hit + 1, "element": int(context.get("element", 0)), "elements": SkillElements.resolve(skill, int(context.get("element", 0)))})

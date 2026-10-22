@@ -6,8 +6,7 @@ const HEIGHTS := {"critical": 40.0, "boost": 50.0, "multi": 40.0}
 const GLOW_RATE := 1.0 / 3.0
 var views: Dictionary = {}
 var lifted := ""
-var target_view: BattleTargetReticle
-var target_actor := ""
+var target_views: Dictionary = {}
 
 func _init() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -65,7 +64,8 @@ func sync(state: BattleState, mode: int, selected: String, speed: float) -> void
 
 func lift(actor: String, card: CardWidget) -> void:
 	lifted = actor
-	if is_instance_valid(target_view) and actor == target_actor:
+	if target_views.has(actor):
+		var target_view: BattleTargetReticle = target_views[actor]
 		target_view.reparent(card, false)
 		target_view.position = Vector2.ZERO
 		target_view.show()
@@ -78,29 +78,30 @@ func lift(actor: String, card: CardWidget) -> void:
 
 func return_to_slots() -> void:
 	if views.has(lifted): views[lifted].reparent(self, false)
-	if is_instance_valid(target_view) and target_view.get_parent() != self: target_view.reparent(self, false)
+	for target_view: BattleTargetReticle in target_views.values():
+		if target_view.get_parent() != self: target_view.reparent(self, false)
 	lifted = ""
 
 func _sync_target(state: BattleState, speed: float) -> void:
-	var actor := state.locked_target if state.phase != "result" else ""
-	if actor.is_empty() or actor not in state.troop.leaders:
-		if is_instance_valid(target_view):
-			target_view.hide()
-			target_view.queue_free()
-		target_view = null
-		target_actor = ""
-		return
-	if not is_instance_valid(target_view):
-		target_view = BattleTargetReticle.new()
-		target_view.name = "LockedTarget"
-		# Keep the marker in card draw order, below the later battle effects.
-		target_view.z_index = 0
-		add_child(target_view)
-	if target_actor != actor and target_view.get_parent() != self: target_view.reparent(self, false)
-	target_actor = actor
-	target_view.playback_speed = speed
-	if target_view.get_parent() == self:
-		target_view.position = Vector2(200 + state.troop.leaders.find(actor) * 218, 730)
-		target_view.visible = actor != lifted
-	else:
-		target_view.show()
+	var actors: Array[String] = []
+	if state.phase != "result": actors.assign(state.locked_targets)
+	for actor: String in target_views.keys():
+		if actor not in actors or actor not in state.troop.leaders:
+			target_views[actor].hide()
+			target_views[actor].queue_free()
+			target_views.erase(actor)
+	for actor: String in actors:
+		if actor not in state.troop.leaders: continue
+		if not target_views.has(actor):
+			var marker := BattleTargetReticle.new()
+			marker.name = "LockedTarget_" + actor
+			marker.z_index = 0
+			add_child(marker)
+			target_views[actor] = marker
+		var target_view: BattleTargetReticle = target_views[actor]
+		target_view.playback_speed = speed
+		if target_view.get_parent() == self:
+			target_view.position = Vector2(200 + state.troop.leaders.find(actor) * 218, 730)
+			target_view.visible = actor != lifted
+		else:
+			target_view.show()

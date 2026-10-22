@@ -20,18 +20,42 @@ static func candidates(state: BattleState) -> Array[String]:
 	return result
 
 static func roll(state: BattleState) -> void:
+	state.locked_targets.clear()
 	if not active(state):
-		state.locked_target = ""
 		return
+	_fill(state)
+	if not state.locked_targets.is_empty(): state.log_message("瞄准目标：" + "、".join(state.locked_targets))
+
+static func _fill(state: BattleState, limit: int = -1) -> void:
+	if limit < 0: limit = state.doushin_target_count
 	var leaders := candidates(state)
-	state.locked_target = "" if leaders.is_empty() else leaders[state.runtime.rng.randi_range(0, leaders.size() - 1)]
-	if not state.locked_target.is_empty(): state.log_message("瞄准目标：" + state.locked_target)
+	for actor: String in state.locked_targets: leaders.erase(actor)
+	while state.locked_targets.size() < limit and not leaders.is_empty():
+		var index := state.runtime.rng.randi_range(0, leaders.size() - 1)
+		state.locked_targets.append(leaders[index])
+		leaders.remove_at(index)
 
 static func sync(state: BattleState) -> void:
-	if not active(state): state.locked_target = ""
+	if not active(state): state.locked_targets.clear()
 	# The support's automatic action selects the initial target. Synchronization
 	# only replaces an existing target that has left the eligible formation.
-	elif not state.locked_target.is_empty() and state.locked_target not in candidates(state): roll(state)
+	elif not state.locked_targets.is_empty():
+		var count := state.locked_targets.size()
+		var leaders := candidates(state)
+		for actor: String in state.locked_targets.duplicate():
+			if actor not in leaders: state.locked_targets.erase(actor)
+		_fill(state, count)
+
+static func unacted_count(state: BattleState) -> int:
+	var count := 0
+	for actor: String in state.locked_targets:
+		if actor in candidates(state) and not state.runtime.acted.get(actor, false): count += 1
+	return count
+
+static func strengthen(state: BattleState) -> void:
+	state.doushin_target_count = mini(7, state.doushin_target_count + 1)
+	# Next turn's automatic aim draws the larger set exactly once.
+	state.log_message("瞄准目标强化：锁定人数%d" % state.doushin_target_count)
 
 static func added(state: BattleState, side: String, id: int) -> void:
 	# Add the replacement first so removing its counterpart keeps the target alive.
@@ -54,7 +78,9 @@ static func removed(state: BattleState, side: String, id: int) -> void:
 static func enemy_turn_start(state: BattleState) -> void:
 	sync(state)
 	if BattleSupports.effects(state, "enemy", "doushin_body").is_empty(): return
-	if state.locked_target.is_empty() or state.runtime.acted.get(state.locked_target, false): return
+	if unacted_count(state) == 0:
+		if has(state, "enemy", LOCK): reaim(state)
+		return
 	BattleSupports.add(state, "enemy", LOCK, state.monster.identity)
 
 static func reaim(state: BattleState) -> void:

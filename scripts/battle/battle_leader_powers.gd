@@ -43,6 +43,15 @@ static func grant(state: BattleState, side: String, power: String, selector: int
 		state.leader_powers[side][actor][power] = true
 		state.log_message("%s 获得%s" % [actor, DISPLAY[power]])
 
+## Troop critical/combo occurrence rates: each is rolled independently at player turn start;
+## success grants that power to one random available leader.
+static func roll_rates(state: BattleState) -> void:
+	for pair: Array in [["critical", "critical"], ["multi", "combo"]]:
+		var chance := state.troop.rate(pair[1])
+		# Skip the draw at 0% so existing seeded battles keep their random sequence.
+		if chance <= 0.0: continue
+		if state.runtime.rng.randf() * 100.0 < chance: grant(state, "player", pair[0], 1, -1)
+
 static func attack(skill: Dictionary, command: Dictionary) -> bool:
 	return int(skill.get("type", 0)) in [1, 2, 3] and command.get("kind", "") == "damage" and not command.get("support_source", false) and command.get("target", "opponent") != "self" and not String(command.get("actor", "")).is_empty()
 

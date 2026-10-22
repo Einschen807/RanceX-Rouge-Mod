@@ -8,6 +8,8 @@ class_name SkillCustomEffects
 ## rules in BattleState so they expire with this battle, never in persistent TroopState.
 
 static func resolve(skill_id: int, _context: Dictionary) -> Array[Dictionary]:
+	if skill_id >= 9971 and skill_id <= 9975:
+		return [{"kind": "support_add", "support": 90, "target": "self", "stacks": skill_id - 9970}]
 	var commands := DesignedSkillEffects.resolve(skill_id, _context)
 	commands.append_array(DoushinSkillEffects.resolve(skill_id, _context))
 	return commands
@@ -19,6 +21,7 @@ static func can_use(skill_id: int, context: Dictionary) -> bool:
 ## These are private rule names, never numbered effects in skills.txt.
 static func passive(skill_id: int) -> Dictionary:
 	match skill_id:
+		9270: return {"strength": 10}
 		9202: return {"barrier": 1}
 		9203: return {"explosion": 2}
 		9204: return {"attack_seal": 1}

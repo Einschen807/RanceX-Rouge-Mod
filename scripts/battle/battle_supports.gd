@@ -11,7 +11,31 @@ static func group(state: BattleState, side: String) -> Array:
 	return state.support_groups[side]
 
 static func definition(state: BattleState, entry: Dictionary) -> Dictionary:
-	return state.troop.catalog.supports.get(entry.id, {})
+	var support: Dictionary = state.troop.catalog.supports.get(entry.id, {})
+	if _strength(support):
+		support = support.duplicate()
+		var stacks := int(entry.get("stacks", 1))
+		support.name = "力量" + roman(stacks)
+		support.description = "物理、魔法伤害 +%d%%\n当前%d层，每层+10%%\n永续、不可被普通解除，无叠加上限" % [stacks * 10, stacks]
+	return support
+
+static func _strength(support: Dictionary) -> bool:
+	return SkillCustomEffects.passive(int(support.get("skill", 0))).has("strength")
+
+static func roman(value: int) -> String:
+	if value >= 1 and value <= 12:
+		return ["Ⅰ", "Ⅱ", "Ⅲ", "Ⅳ", "Ⅴ", "Ⅵ", "Ⅶ", "Ⅷ", "Ⅸ", "Ⅹ", "Ⅺ", "Ⅻ"][value - 1]
+	# Parentheses multiply by 1000, keeping arbitrarily high stack names compact.
+	var result := ""
+	if value >= 4000:
+		result = "(" + roman(value / 1000) + ")"
+		value %= 1000
+	# The game's font contains Unicode I-XII; use Latin Roman glyphs for L/C/D/M.
+	for pair: Array in [[1000, "M"], [900, "CM"], [500, "D"], [400, "CD"], [100, "C"], [90, "ⅩC"], [50, "L"], [40, "ⅩL"], [10, "Ⅹ"], [9, "Ⅸ"], [5, "Ⅴ"], [4, "Ⅳ"], [1, "Ⅰ"]]:
+		while value >= int(pair[0]):
+			result += String(pair[1])
+			value -= int(pair[0])
+	return result
 
 static func effects(state: BattleState, side: String, effect: Variant) -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
@@ -33,6 +57,9 @@ static func effects(state: BattleState, side: String, effect: Variant) -> Array[
 static func rate(state: BattleState, side: String, effect: int) -> float:
 	var result := 0.0
 	for item: Dictionary in effects(state, side, effect): result += float(item.value)
+	if effect in [8, 9]:
+		for item: Dictionary in effects(state, side, "strength"):
+			result += float(item.value) * int(item.entry.get("stacks", 1))
 	return result
 
 static func strategist(state: BattleState, side: String) -> float:
@@ -43,7 +70,7 @@ static func strategist(state: BattleState, side: String) -> float:
 static func attack_blocked(state: BattleState, side: String, skill: Dictionary) -> bool:
 	return int(skill.type) in [1, 2, 3] and not effects(state, "enemy" if side == "player" else "player", ATTACK_SEAL).is_empty()
 
-static func add(state: BattleState, side: String, id: int, actor := "") -> bool:
+static func add(state: BattleState, side: String, id: int, actor := "", stacks := 1) -> bool:
 	if not state.troop.catalog.supports.has(id): return false
 	var support: Dictionary = state.troop.catalog.supports[id]
 	var list := group(state, side)
@@ -52,6 +79,11 @@ static func add(state: BattleState, side: String, id: int, actor := "") -> bool:
 		if definition(state, list[i]).identity == support.identity:
 			found = i
 			break
+	if _strength(support) and found >= 0:
+		list[found].stacks = int(list[found].get("stacks", 1)) + maxi(1, stacks)
+		state.support_event.emit(side, int(list[found].uid), "updated")
+		state.log_message("%s配置%s" % ["联合部队" if side == "player" else state.monster.name, definition(state, list[found]).name])
+		return true
 	if found >= 0 and int(support.repeat) == 2: return false
 	if found >= 0 and int(support.repeat) == 4:
 		var old := definition(state, list[found])
@@ -62,6 +94,7 @@ static func add(state: BattleState, side: String, id: int, actor := "") -> bool:
 		state.log_message("支援栏已满，未配置%s" % support.name)
 		return false
 	var entry := {"uid": state.next_support_uid, "id": int(support.id), "remaining": int(support.rounds), "born_turn": int(state.support_turns[side]), "actor": actor}
+	if _strength(support): entry.stacks = maxi(1, stacks)
 	state.next_support_uid += 1
 	if found >= 0 and int(support.repeat) != 3:
 		entry.uid = list[found].uid
@@ -72,7 +105,7 @@ static func add(state: BattleState, side: String, id: int, actor := "") -> bool:
 		BattleShields.add(state, "player", float(state.ability_rules.support_shield))
 	BattleDoushinTargets.added(state, side, id)
 	state.support_event.emit(side, entry.uid, "added")
-	state.log_message("%s配置%s" % ["联合部队" if side == "player" else state.monster.name, support.name])
+	state.log_message("%s配置%s" % ["联合部队" if side == "player" else state.monster.name, definition(state, entry).name])
 	return true
 
 static func remove(state: BattleState, side: String, uid: int, event := "removed") -> void:
@@ -160,10 +193,11 @@ static func absorb(state: BattleState, side: String, command: Dictionary, potent
 			return true
 	var barriers := effects(state, side, BARRIER)
 	if barriers.is_empty() or potential <= 0.0: return false
-	var breaker: bool = String(command.get("actor_identity", "")) in ["兰斯", "健太郎"] and not command.get("support_source", false) and command.get("kind", "") == "damage"
+	var breaker: bool = RelicEffects.can_break_barrier(state, "enemy" if side == "player" else "player", command) and command.get("kind", "") == "damage"
 	if breaker:
 		for item: Dictionary in barriers: remove(state, side, item.entry.uid, "broken")
 		state.pending_support_feedback.append({"side": side, "event": "barrier_break", "damage": 0.0})
+		RelicEffects.barrier_broken(state, side)
 		return false
 	state.pending_support_feedback.append({"side": side, "event": "barrier_block", "damage": 0.0})
 	return true

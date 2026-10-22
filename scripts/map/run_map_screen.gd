@@ -280,11 +280,34 @@ func _show_loot(type: int, won := true) -> void:
 	add_child(loot)
 
 func _rest_screen() -> void:
-	var count: int = maxi(1, int(session.pending.get("upgrade_count", 1)))
-	_dialog("休整部队", "选择一项：恢复30%%生命值、强化%d张卡，或重置所有卡牌状态。" % count, "node", Vector2(820, 380))
-	_action("恢复30%生命值", Vector2(30, 265), func() -> void: session.recover_at_rest(); _finish_node(), Vector2(240, 62))
-	_action("强化%d张卡" % count, Vector2(290, 265), _training_screen.bind(count), Vector2(240, 62))
-	_action("重置所有卡牌", Vector2(550, 265), func() -> void: session.reset_cards_at_rest(); _finish_node(), Vector2(240, 62))
+	_clear_modal()
+	var screen := RestSiteScreen.new()
+	screen.session = session
+	screen.upgrade_count = maxi(1, int(session.pending.get("upgrade_count", 1)))
+	screen.action_selected.connect(_rest_action.bind(screen))
+	# Completion effects end with a black transition back to the map.
+	screen.continue_requested.connect(func() -> void: get_node("/root/ScreenTransition").play(_finish_node))
+	_modal = screen
+	_modal_kind = "rest"
+	add_child(screen)
+
+func _rest_action(id: String, screen: RestSiteScreen) -> void:
+	var info := {}
+	match id:
+		"heal":
+			info.before = session.hp()
+			session.recover_at_rest()
+			info.after = session.hp()
+		"reset":
+			session.reset_cards_at_rest()
+		"hatch":
+			info.names = session.hatch_eggs_at_rest()
+		"train":
+			info.names = session.train_saints_at_rest()
+		"upgrade":
+			_training_screen(screen.upgrade_count)
+			return
+	screen.play_completion(id, info)
 
 func _training_screen(count: int) -> void:
 	_clear_modal()
@@ -292,6 +315,7 @@ func _training_screen(count: int) -> void:
 	screen.troop = session.troop
 	screen.remaining = count
 	screen.rest_mode = true
+	screen.fade_out = true # The forge finishes under a black transition.
 	screen.completed.connect(_finish_node)
 	screen.cancelled.connect(func() -> void:
 		_clear_modal()
@@ -445,6 +469,10 @@ func _input(event: InputEvent) -> void:
 		return # Events advance only through their choice/result buttons.
 	elif _modal_kind == "node":
 		_clear_modal()
+	elif _modal_kind == "rest":
+		# Before choosing, Back returns to the map; after an action it continues.
+		if (_modal as RestSiteScreen).finished: (_modal as RestSiteScreen).skip_completion()
+		else: _clear_modal()
 	elif _modal_kind == "end":
 		close_requested.emit()
 	else:

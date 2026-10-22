@@ -100,7 +100,7 @@ func refresh() -> void:
 			var record: Dictionary = session.catalog.find_name(name)
 			_picture(slot, "mini_back_%d" % record.faction, Vector2.ZERO, Vector2(52, 78))
 			var portrait := TextureRect.new()
-			portrait.texture = load("res://assets/cards/%s.png" % record.portrait)
+			portrait.texture = load(CardCatalog.portrait_path(record))
 			portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 			portrait.size = Vector2(52, 78)
 			portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE

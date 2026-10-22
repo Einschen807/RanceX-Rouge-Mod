@@ -151,8 +151,14 @@ func set_card_upgraded(display_name: String, upgraded: bool) -> bool:
 	if not has_card(display_name): return false
 	var before := catalog.find_name(display_name)
 	var base := display_name.trim_suffix(CardCatalog.UPGRADE_SUFFIX)
-	var after := catalog.find_name(base + CardCatalog.UPGRADE_SUFFIX if upgraded else base)
-	if after.is_empty() or after.name == before.name: return false
+	return replace_card_version(display_name, base + CardCatalog.UPGRADE_SUFFIX if upgraded else base)
+
+## Swaps one owned card for another record in place (upgrade toggle, saint growth).
+func replace_card_version(display_name: String, target_name: String) -> bool:
+	if not has_card(display_name): return false
+	var before := catalog.find_name(display_name)
+	var after := catalog.find_name(target_name)
+	if after.is_empty() or after.name == before.name or has_card(after.name): return false
 	# Replace in place: acquisition order, deployment and per-instance state survive.
 	available[available.find(before)] = after
 	levels[after.name] = level(before.name)
@@ -181,6 +187,7 @@ func acquire_relic(display_name: String, source_position := Vector2(960, 540)) -
 	if not database.load_catalog() or not database.by_name.has(display_name): return false
 	relics.append(display_name)
 	if RelicEffects.PERIODS.has(display_name): relic_counters[display_name] = 0
+	RelicEffects.acquired(self, display_name)
 	changed.emit()
 	relic_acquired.emit(display_name, source_position)
 	return true
@@ -326,7 +333,7 @@ func rate(kind: String) -> float:
 		"physical_resist": value = float(resistance_rates.physical)
 		"magic_resist": value = float(resistance_rates.magic)
 	var formation := formation_effect_rates if battle_active else SkillFormationEffects.collect(self)
-	value += float(formation.get(kind, 0.0))
+	value += float(formation.get(kind, 0.0)) + RelicEffects.troop_rate_bonus(self, kind)
 	return minf(value, rate_cap())
 
 func can_toggle_bonus(index: int) -> bool:

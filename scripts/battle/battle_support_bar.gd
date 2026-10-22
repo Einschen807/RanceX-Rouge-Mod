@@ -49,6 +49,7 @@ func sync() -> void:
 			node.set_meta("display_scale", display_scale)
 		node.position = support_position(i) - node.pivot_offset * (1.0 - display_scale)
 		node.get_node("Round").text = str(entry.remaining)
+		node.get_node("Title").text = support.name
 		node.visible = not view.battle.information_hidden(side)
 	if side == "player": view.position_restart_beside_support(self)
 

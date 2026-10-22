@@ -48,6 +48,7 @@ func _load_data() -> bool:
 	troop.configure(catalog, false, pools.initial_cards)
 	troop.changed.connect(_troop_changed)
 	troop.troop_leveled_up.connect(troop_leveled_up.emit)
+	troop.relic_acquired.connect(_relic_acquired)
 	return true
 
 func can_resume() -> bool:
@@ -352,6 +353,25 @@ func heal(percent: int) -> void:
 func recover_at_rest() -> void:
 	heal(30)
 
+## Rest option: every held egg hatches at once; returns the cards obtained.
+func hatch_eggs_at_rest() -> Array[String]:
+	var hatched: Array[String] = []
+	for egg: String in RelicEffects.held_eggs(troop):
+		troop.remove_relic(egg)
+		troop.acquire_card(RelicEffects.EGGS[egg])
+		hatched.append(RelicEffects.EGGS[egg])
+	changed.emit()
+	return hatched
+
+## Rest option: every owned small saint grows into the adult version in place.
+func train_saints_at_rest() -> Array[String]:
+	var grown: Array[String] = []
+	var targets := RelicEffects.growable_saints(troop)
+	for small: String in targets:
+		if troop.replace_card_version(small, targets[small]): grown.append(targets[small])
+	changed.emit()
+	return grown
+
 func reset_cards_at_rest() -> void:
 	troop.reset_card_states()
 	changed.emit()
@@ -365,6 +385,11 @@ func train(name: String, stars := 1) -> void:
 
 func grant_card(name: String) -> void:
 	troop.acquire_card(name)
+
+func _relic_acquired(display_name: String, _at: Vector2) -> void:
+	if display_name != "中元茶泡饭": return
+	missing_hp = 0.0
+	changed.emit()
 
 func _troop_changed() -> void:
 	changed.emit()

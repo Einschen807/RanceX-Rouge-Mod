@@ -1,7 +1,7 @@
 extends RefCounted
 class_name MonsterCatalog
 
-const FIELDS := ["name", "identity", "portrait", "background", "base_hp", "base_at", "physical_resist", "magic_resist", "kind", "behavior", "analysis"]
+const FIELDS := ["name", "identity", "portrait", "background", "base_hp", "base_at", "physical_resist", "magic_resist", "kind", "behavior", "analysis", "damage_cap"]
 var monsters: Dictionary = {}
 var behaviors: Dictionary = {}
 var opening_skills: Dictionary = {}
@@ -55,8 +55,10 @@ func load_catalog(skills: Dictionary, monster_path: String = "res://data/monster
 			index += 1
 		behaviors[int(row[0])] = actions
 	for row: Array in _read(monster_path):
+		# Legacy definitions have no per-hit cap.
+		if row.size() == 11: row.append(0)
 		if row.size() != FIELDS.size():
-			errors.append("怪物记录必须有11个字段")
+			errors.append("怪物记录必须有12个字段（末项为限伤%，0表示不限伤）")
 			continue
 		var valid_types := true
 		for i: int in range(row.size()):
@@ -67,6 +69,9 @@ func load_catalog(skills: Dictionary, monster_path: String = "res://data/monster
 		var monster := {}
 		for i: int in range(FIELDS.size()):
 			monster[FIELDS[i]] = row[i] if row[i] is String else int(row[i])
+		if monster.damage_cap < 0 or monster.damage_cap > 100:
+			errors.append("怪物限伤必须为0～100的整数：" + monster.identity)
+			continue
 		if monster.identity.is_empty() or monsters.has(monster.identity) or monster.name.is_empty() or monster.base_hp <= 0 or monster.base_at < 0 or monster.physical_resist < 0 or monster.physical_resist > 100 or monster.magic_resist < 0 or monster.magic_resist > 100 or monster.kind not in [1, 2, 3] or not behaviors.has(monster.behavior):
 			errors.append("怪物识别名重复或字段无效：" + monster.identity)
 			continue

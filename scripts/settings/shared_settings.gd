@@ -45,6 +45,14 @@ func set_cut_in_mode(value: int) -> void:
 func should_play_cut_in(lethal: bool) -> bool:
 	return cut_in_mode() == CutInMode.ALWAYS or (cut_in_mode() == CutInMode.LETHAL and lethal)
 
+## 和谐模式: nude cards (cards.txt 是否裸卡=1) use the censored face.
+func harmony_mode() -> bool:
+	return bool(config.get_value("display", "harmony_mode", false))
+
+func set_harmony_mode(value: bool) -> void:
+	config.set_value("display", "harmony_mode", value)
+	config.save("user://settings.cfg")
+
 func battle_speed() -> int:
 	return clampi(int(config.get_value("battle", "speed", 3)), 1, 3)
 

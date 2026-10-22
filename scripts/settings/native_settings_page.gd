@@ -62,6 +62,16 @@ func _window() -> void:
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN if value else DisplayServer.WINDOW_MODE_WINDOWED)
 		settings.config.set_value("display", "fullscreen", value)
 		settings.config.save("user://settings.cfg"))
+	_section("内容显示", 450)
+	var harmony := BattleArt.button(body, "settings_check", Vector2(380, 560), Vector2(60, 60), func() -> void: pass)
+	harmony.name = "HarmonyMode"
+	harmony.toggle_mode = true
+	harmony.set_pressed_no_signal(settings.harmony_mode())
+	harmony.selected = harmony.button_pressed
+	BattleArt.label(body, "和谐模式", Vector2(465, 563), Vector2(530, 52), 27)
+	harmony.toggled.connect(func(value: bool) -> void:
+		harmony.selected = value
+		settings.set_harmony_mode(value))
 
 func _sound() -> void:
 	for i: int in range(settings.AUDIO_BUSES.size()):

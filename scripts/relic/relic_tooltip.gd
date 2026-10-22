@@ -6,6 +6,12 @@ func _init() -> void:
 	size = Vector2(440, 180)
 	add_theme_stylebox_override("panel", BattleArt.panel_style())
 
+## Below the anchor when the box fits, otherwise flipped above it.
+func show_beside(record: Dictionary, anchor: Rect2, gap := 10.0) -> void:
+	var below := anchor.end.y + gap
+	var y := below if below + size.y <= 1080.0 - 8.0 else anchor.position.y - gap - size.y
+	show_record(record, Vector2(anchor.position.x + 20, y))
+
 func show_record(record: Dictionary, at: Vector2) -> void:
 	BattleArt.clear(self)
 	var backing := ColorRect.new()
