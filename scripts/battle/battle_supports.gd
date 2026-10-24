@@ -6,6 +6,7 @@ const BARRIER := "barrier"
 const EXPLOSION := "explosion"
 const ATTACK_SEAL := "attack_seal"
 const DAMAGE_BLOCK := "damage_block"
+const HARD_SHELL := "hard_shell"
 
 static func group(state: BattleState, side: String) -> Array:
 	return state.support_groups[side]
@@ -17,10 +18,20 @@ static func definition(state: BattleState, entry: Dictionary) -> Dictionary:
 		var stacks := int(entry.get("stacks", 1))
 		support.name = "力量" + roman(stacks)
 		support.description = "物理、魔法伤害 +%d%%\n当前%d层，每层+10%%\n永续、不可被普通解除，无叠加上限" % [stacks * 10, stacks]
+	elif _hard_shell(support):
+		support = support.duplicate()
+		var stacks := int(entry.get("stacks", 1))
+		support.name = "%s%d" % [support.identity, stacks]
 	return support
 
 static func _strength(support: Dictionary) -> bool:
 	return SkillCustomEffects.passive(int(support.get("skill", 0))).has("strength")
+
+static func _hard_shell(support: Dictionary) -> bool:
+	return SkillCustomEffects.passive(int(support.get("skill", 0))).has(HARD_SHELL)
+
+static func _stacked(support: Dictionary) -> bool:
+	return _strength(support) or _hard_shell(support)
 
 static func roman(value: int) -> String:
 	if value >= 1 and value <= 12:
@@ -79,7 +90,7 @@ static func add(state: BattleState, side: String, id: int, actor := "", stacks :
 		if definition(state, list[i]).identity == support.identity:
 			found = i
 			break
-	if _strength(support) and found >= 0:
+	if _stacked(support) and found >= 0:
 		list[found].stacks = int(list[found].get("stacks", 1)) + maxi(1, stacks)
 		state.support_event.emit(side, int(list[found].uid), "updated")
 		state.log_message("%s配置%s" % ["联合部队" if side == "player" else state.monster.name, definition(state, list[found]).name])
@@ -94,7 +105,7 @@ static func add(state: BattleState, side: String, id: int, actor := "", stacks :
 		state.log_message("支援栏已满，未配置%s" % support.name)
 		return false
 	var entry := {"uid": state.next_support_uid, "id": int(support.id), "remaining": int(support.rounds), "born_turn": int(state.support_turns[side]), "actor": actor}
-	if _strength(support): entry.stacks = maxi(1, stacks)
+	if _stacked(support): entry.stacks = maxi(1, stacks)
 	state.next_support_uid += 1
 	if found >= 0 and int(support.repeat) != 3:
 		entry.uid = list[found].uid
@@ -183,6 +194,20 @@ static func after_action(state: BattleState, side: String) -> void:
 		var amount := state.lose_hp(target, float(item.value))
 		state.pending_support_feedback.append({"side": target, "event": "explode", "damage": amount})
 		state._check_result()
+
+static func has_hard_shell(state: BattleState, side: String) -> bool:
+	return not effects(state, side, HARD_SHELL).is_empty()
+
+## One landed hit spends one shell layer; the last layer removes the support.
+static func spend_hard_shell(state: BattleState, side: String) -> void:
+	var shells := effects(state, side, HARD_SHELL)
+	if shells.is_empty(): return
+	var entry: Dictionary = shells[0].entry
+	if int(entry.get("stacks", 1)) <= 1:
+		remove(state, side, int(entry.uid))
+		return
+	entry.stacks = int(entry.stacks) - 1
+	state.support_event.emit(side, int(entry.uid), "updated")
 
 static func absorb(state: BattleState, side: String, command: Dictionary, potential: float) -> bool:
 	if side == "player" and command.get("kind", "") == "damage" and command.get("target", "opponent") != "self" and potential > 0.0:

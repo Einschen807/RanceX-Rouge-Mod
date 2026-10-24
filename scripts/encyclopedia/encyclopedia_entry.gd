@@ -32,7 +32,7 @@ func _ready() -> void:
 	interior.region = Rect2(32, 70, 570, 935)
 	panel.texture = interior
 	_frame(Vector2.ZERO, visual.size)
-	caption = _label(title_text, Vector2(20, 45), Vector2(380, 55), 34, Color(1.0, 0.86, 0.53))
+	caption = _label(title_text, Vector2(20, 45), Vector2(380, 55), 34, FormationArt.GOLD)
 	var rule: ColorRect = ColorRect.new()
 	rule.position = Vector2(54, 120)
 	rule.size = Vector2(312, 1)

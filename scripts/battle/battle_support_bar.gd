@@ -24,15 +24,12 @@ func sync() -> void:
 	var group := BattleSupports.group(view.battle, side)
 	var alive: Array[int] = []
 	for entry: Dictionary in group: alive.append(entry.uid)
+	var erased := false
 	for uid: int in entries.keys():
 		if uid not in alive:
-			var node: Control = entries[uid]
+			erased = true
+			_erase(entries[uid])
 			entries.erase(uid)
-			node.get_node("ClickArea").hide()
-			view._presentation.native("support_%s_remove" % side, node.position).scale = Vector2.ONE * float(node.get_meta("display_scale", DISPLAY_SCALE))
-			var tween := view._presentation._tween()
-			tween.tween_property(node, "modulate:a", 0.0, 0.2)
-			tween.tween_callback(node.queue_free)
 	for i: int in range(group.size()):
 		var entry: Dictionary = group[i]
 		var support := BattleSupports.definition(view.battle, entry)
@@ -47,11 +44,40 @@ func sync() -> void:
 		if not is_equal_approx(float(node.get_meta("display_scale", 0.0)), display_scale):
 			node.scale = Vector2.ONE * display_scale
 			node.set_meta("display_scale", display_scale)
-		node.position = support_position(i) - node.pivot_offset * (1.0 - display_scale)
+		_place(node, support_position(i) - node.pivot_offset * (1.0 - display_scale), erased)
 		node.get_node("Round").text = str(entry.remaining)
 		node.get_node("Title").text = support.name
 		node.visible = not view.battle.information_hidden(side)
 	if side == "player": view.position_restart_beside_support(self)
+
+## Original AegisEffectView erase: the 解除 sound and flat play above the row while it
+## fades out linearly over 0.2s. Every removal path uses this, whatever its event name.
+func _erase(node: Control) -> void:
+	node.get_node("ClickArea").hide()
+	var slide: Tween = node.get_meta("slide", null)
+	if slide != null and slide.is_valid(): slide.kill()
+	var effect := view._presentation.native("support_%s_remove" % side, node.position)
+	effect.scale = Vector2.ONE * float(node.get_meta("display_scale", DISPLAY_SCALE))
+	effect.z_index = 100
+	view._presentation._sound("res://assets/audio/support_remove.ogg")
+	var tween := view._presentation._tween()
+	tween.tween_property(node, "modulate:a", 0.0, 0.2)
+	tween.tween_callback(node.queue_free)
+
+## Original ChangeIndex: after an erase the remaining rows hold for 1.0s, then slide 0.2s.
+func _place(node: Control, target: Vector2, erased: bool) -> void:
+	var slide: Tween = node.get_meta("slide", null)
+	var sliding := slide != null and slide.is_valid()
+	if node.get_meta("target", node.position) == target and (sliding or node.position == target): return
+	node.set_meta("target", target)
+	if sliding: slide.kill()
+	if not erased and not sliding:
+		node.position = target
+		return
+	slide = view._presentation._tween()
+	if erased: slide.tween_interval(1.0)
+	slide.tween_property(node, "position", target, 0.2).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	node.set_meta("slide", slide)
 
 func _create(entry: Dictionary, support: Dictionary, at: Vector2) -> void:
 	var node := Control.new()
@@ -129,4 +155,3 @@ func on_support_event(event_side: String, uid: int, event: String) -> void:
 	if event == "added" and entries.has(uid):
 		view._presentation.native("support_%s_add" % side, entries[uid].position).scale = Vector2.ONE * _display_scale()
 		view._presentation._sound("res://assets/audio/support_add.ogg")
-	elif event == "removed": view._presentation._sound("res://assets/audio/support_remove.ogg")

@@ -1,7 +1,10 @@
 extends RefCounted
 class_name FormationArt
 
-const GOLD := Color(0.97, 0.84, 0.46)
+## Original title text yellow (Pact 字体色 255,244,121: skill / status / monster names).
+const GOLD := Color8(255, 244, 121)
+## Warmer gold kept for borders and glow ornaments, not text.
+const ORNAMENT_GOLD := Color(0.97, 0.84, 0.46)
 static func picture(parent: Node, asset: String, at: Vector2, dimensions: Vector2) -> TextureRect:
 	var node := TextureRect.new()
 	node.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -29,7 +32,7 @@ static func label(parent: Node, text: String, at: Vector2, dimensions: Vector2, 
 	parent.add_child(node)
 	return node
 
-static func box(color: Color, border: Color = GOLD) -> StyleBoxFlat:
+static func box(color: Color, border: Color = ORNAMENT_GOLD) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
 	style.bg_color = color
 	style.border_color = border

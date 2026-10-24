@@ -7,6 +7,7 @@ const ENEMY_TEMPO := 1.15
 const MULTI_HIT_INTERVAL := 1.2
 const MULTI_HIT_RECOVERY := 0.15
 const MULTI_HIT_NUMBER_TIME := 0.8
+static var _timings: Dictionary = {}
 ## Action presentation owns timing; BattleState still owns all combat arithmetic.
 var view: BattleScene
 var layer: Control
@@ -99,13 +100,31 @@ func _sound(path: String) -> void:
 	voice.play()
 
 func _impact_time(effect: OriginalFlatPlayer) -> float:
-	if effect._data.has("impact_time"): return float(effect._data.impact_time)
-	for track: Dictionary in effect._data.timelines:
+	return _data_impact(effect._data, effect.fps, effect._root.end_frame)
+
+static func _data_impact(data: Dictionary, fps: float, end_frame: int) -> float:
+	if data.has("impact_time"): return float(data.impact_time)
+	for track: Dictionary in data.timelines:
 		for event: Dictionary in track.get("script", []):
 			for op: Array in event.ops:
 				if op.size() > 1 and op[0] == "text" and op[1] == "伤害":
-					return float(event.frame) / effect.fps
-	return float(effect._root.end_frame) / effect.fps * 0.8
+					return float(event.frame) / fps
+	return float(end_frame) / fps * 0.8
+
+## Native impact and duration of an effect, read without spawning it.
+static func _effect_timing(descriptor: Dictionary) -> Dictionary:
+	var path := String(descriptor.path)
+	if not _timings.has(path):
+		var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+		var fps := float(data.fps)
+		var end_frame := 0
+		for track: Dictionary in data.timelines: end_frame = maxi(end_frame, int(track.begin) + int(track.count) - 1)
+		_timings[path] = {"impact": _data_impact(data, fps, end_frame), "duration": float(data.get("play_duration", float(end_frame + 1) / fps))}
+	return _timings[path]
+
+static func _has_cut_in(skill: Dictionary) -> bool:
+	var path := SkillCutInCatalog.path_for(str(skill.get("cut_in", "")))
+	return not path.is_empty() and ResourceLoader.exists(path, "PackedScene")
 
 func _card_lift(actor: String) -> CardWidget:
 	view.set_lifted_actor(actor)
@@ -292,11 +311,10 @@ func action(actor: String, id: int, enemy := false, slot: int = -1, automatic: D
 		if automatic.is_empty(): view.show_ap_payment(actor, skill, slot if slot >= 0 else view.battle.skill_slot(actor, id))
 		card = _card_lift(actor)
 	var banner := _banner(actor, skill, enemy, support_action, relic_action)
-	await view._wait_animation(0.2 if support_action else (0.14 if enemy else CARD_MOVE_TIME) / rate)
+	var lift_time: float = 0.2 if support_action else (0.14 if enemy else CARD_MOVE_TIME) / rate
 	var forecast := BattleForecast.action(view.battle, actor, id, enemy, slot, automatic)
-	var attack_cut_in: Control
-	if get_node("/root/Settings").should_play_cut_in(not enemy and forecast.lethal):
-		attack_cut_in = await _play_cut_in(skill, card)
+	var cut_in_skill := skill
+	var play_cut_in: bool = get_node("/root/Settings").should_play_cut_in(not enemy and forecast.lethal)
 	var attack := int(skill.type) in [1, 2, 3]
 	if not enemy and id in DesignedSkillEffects.MIMIC and not view.battle.last_friendly_skill.is_empty():
 		skill = view.battle.last_friendly_skill
@@ -308,10 +326,28 @@ func action(actor: String, id: int, enemy := false, slot: int = -1, automatic: D
 	var element := 0 if enemy else int(view.battle.troop.catalog.find_name(actor).get("element", 0))
 	var descriptor := effect_for(skill, element)
 	var effect_rate := rate
-	var timing := _skill_effect(descriptor, at, effect_rate)
-	if is_instance_valid(attack_cut_in):
-		attack_cut_in.call("attack_effect_started", at)
-	await view._wait_animation(float(timing.impact) / effect_rate)
+	var timing: Dictionary
+	# Leader actions without a cut-in start their effect with the card lift and stretch it over
+	# the unchanged action length, so fast speeds keep a readable effect and a synced hit sound.
+	var spread := false
+	var spread_target := 0.0
+	if is_instance_valid(card) and not descriptor.is_empty() and not (play_cut_in and _has_cut_in(cut_in_skill)):
+		spread = true
+		var probe := _effect_timing(descriptor)
+		spread_target = lift_time + 0.12 + float(probe.impact) + maxf(0.55, maxf(float(probe.duration) - float(probe.impact) - 0.12, 0.54))
+		effect_rate = clampf(float(probe.duration) / spread_target, 1.0 / view.animation_speed(), 1.0)
+		timing = _skill_effect(descriptor, at, effect_rate)
+		await view._wait_animation(maxf(lift_time, float(timing.impact) / effect_rate))
+		spread_target -= maxf(lift_time, float(timing.impact) / effect_rate)
+	else:
+		await view._wait_animation(lift_time)
+		var attack_cut_in: Control
+		if play_cut_in:
+			attack_cut_in = await _play_cut_in(cut_in_skill, card)
+		timing = _skill_effect(descriptor, at, effect_rate)
+		if is_instance_valid(attack_cut_in):
+			attack_cut_in.call("attack_effect_started", at)
+		await view._wait_animation(float(timing.impact) / effect_rate)
 	var result: Dictionary
 	if not automatic.is_empty():
 		result = automatic
@@ -359,7 +395,9 @@ func action(actor: String, id: int, enemy := false, slot: int = -1, automatic: D
 	# Let long effects finish before the next actor starts, preserving their native tail.
 	var effect_tail := (float(timing.duration) - float(timing.impact)) / effect_rate - extra_impact_delay - 0.12 / rate
 	var damage_tail := ((MULTI_HIT_NUMBER_TIME if multi_hit else 0.66) - 0.12) / rate
-	await view._wait_animation(maxf(0.55 / rate, maxf(effect_tail, damage_tail)))
+	var settle := maxf(0.55 / rate, maxf(effect_tail, damage_tail))
+	if spread and not multi_hit: settle = maxf(0.0, spread_target - 0.12 / rate - extra_impact_delay)
+	await view._wait_animation(settle)
 	# Give native/tween processing the final frame before the next action starts.
 	if multi_hit: await get_tree().process_frame
 	if not automatic.get("followup_action", false): await repeated_actions()

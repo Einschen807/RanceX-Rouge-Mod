@@ -2,12 +2,14 @@ extends RefCounted
 class_name RelicEffects
 ## Execution follows inventory order, also the left-to-right HUD order.
 ## Persistent counters shown on the HUD. Most advance per player turn; AP_SPENT ones advance per AP paid.
-const PERIODS := {"加奈美忍法帖": 6, "3段喷射发动机": 3, "飞马": 10, "瓦古奖章": 10}
+const PERIODS := {"加奈美忍法帖": 6, "3段喷射发动机": 3, "飞马": 10, "瓦古奖章": 10, "拉包尔之弓": 3}
 const AP_SPENT := ["飞马"]
 ## Skill 0 means the native AP+1 recovery handled in execute().
-const SKILLS := {"加奈美忍法帖": 9800, "妖怪宝具": 9801, "郁金香2号": 9802, "郁金香兵": 9803, "郁金香3号": 9804, "平实柠檬": 9805, "赫尔曼石墙": 9806, "守护神": 9807, "塔罗柯发动机": 0, "利萨斯的旗帜": 9808, "赫尔曼的旗帜": 9809, "男人的友情": 9810, "医学全集": 9811, "雷伊奖章": 9812, "希尔琪奖章": 9813, "瓦古奖章": 9814}
+const SKILLS := {"加奈美忍法帖": 9800, "妖怪宝具": 9801, "郁金香2号": 9802, "郁金香兵": 9803, "郁金香3号": 9804, "平实柠檬": 9805, "赫尔曼石墙": 9806, "守护神": 9807, "塔罗柯发动机": 0, "利萨斯的旗帜": 9808, "赫尔曼的旗帜": 9809, "男人的友情": 9810, "医学全集": 9811, "雷伊奖章": 9812, "希尔琪奖章": 9813, "瓦古奖章": 9814, "拉包尔之弓": 9815, "毒团子": 9816}
 ## Fired once at the start of round 1.
-const BATTLE_START := ["郁金香2号", "平实柠檬", "赫尔曼石墙", "塔罗柯发动机", "守护神", "医学全集"]
+const BATTLE_START := ["郁金香2号", "平实柠檬", "赫尔曼石墙", "塔罗柯发动机", "守护神", "医学全集", "毒团子"]
+## Once-per-run relics: counter 1 marks them spent (saved with the troop, dimmed on the HUD).
+const ONE_SHOT := ["哈尼打火机"]
 ## Fired when the player ends the given round, before the enemy turn begins.
 const TURN_END_ROUNDS := {"郁金香3号": 7}
 ## 希尔琪奖章: fired at every player turn end while the shield reaches this percent of max HP.
@@ -15,6 +17,74 @@ const HILCHI_SHIELD := 10.0
 ## 侍从铠甲: extra shield percent on every player skill shield grant (not relics or supports).
 const SQUIRE_SHIELD := 1.0
 const MALE := 1
+## Rest site: 休息 heals this percent of max HP; 料理道具 adds COOKING_HEAL.
+const REST_HEAL := 30
+const COOKING_HEAL := 10
+## Golden statues: shells per shell gain (葫芦), per new card (向日葵), on acquisition (盆栽).
+const GOURD_GOLD := 3
+const SUNFLOWER_GOLD := 3
+const BONSAI_GOLD := 300
+
+## Amulets: +25 damage-rate points on the player's attacks. Status amulets raise the
+## element weakness of a burning/frozen/shocked enemy (50% -> 75%); 光/暗 boost those elements.
+const AMULET_RATE := 0.25
+const STATUS_AMULETS := {1: ["炎之护符", BattleStatusEffects.BURN], 2: ["冰之护符", BattleStatusEffects.FREEZE], 3: ["雷之护符", BattleStatusEffects.SHOCK]}
+const ELEMENT_AMULETS := {4: "光之护符", 5: "暗之护符"}
+## 求人票: normal card chests opened on acquisition.
+const JOB_TICKET_CHESTS := 5
+const NORMAL_CHEST := 1
+## 漫画肉: after a victory below this HP percent, heal MEAT_HEAL percent of max HP.
+const MEAT_THRESHOLD := 30.0
+const MEAT_HEAL := 8.0
+## 哈尼打火机: revive once per run at this percent of max HP.
+const REVIVE_PERCENT := 50.0
+
+static func amulet_rate(state: BattleState, side: String, target_side: String, elements: Array) -> float:
+	if side != "player" or target_side != "enemy": return 0.0
+	var rate := 0.0
+	for element: int in STATUS_AMULETS:
+		var amulet: Array = STATUS_AMULETS[element]
+		if element in elements and amulet[0] in state.troop.relics and state.has_status("enemy", amulet[1]): rate += AMULET_RATE
+	for element: int in ELEMENT_AMULETS:
+		if element in elements and ELEMENT_AMULETS[element] in state.troop.relics: rate += AMULET_RATE
+	return rate
+
+static func spent(troop: TroopState, name: String) -> bool:
+	return name in ONE_SHOT and int(troop.relic_counters.get(name, 0)) > 0
+
+## 哈尼打火机: the first time the player's HP reaches 0 this run, come back at 50%.
+static func revive(state: BattleState) -> bool:
+	if state.player_hp > 0.0 or "哈尼打火机" not in state.troop.relics or spent(state.troop, "哈尼打火机"): return false
+	state.troop.relic_counters["哈尼打火机"] = 1
+	state.player_hp = state.player_max_hp * REVIVE_PERCENT / 100.0
+	notify(state, "哈尼打火机")
+	return true
+
+## 漫画肉: missing HP after a victory.
+static func victory_missing_hp(troop: TroopState, player_hp: float, max_hp: float) -> float:
+	var missing := maxf(0.0, max_hp - player_hp)
+	if "漫画肉" in troop.relics and player_hp < max_hp * MEAT_THRESHOLD / 100.0:
+		missing = maxf(0.0, missing - max_hp * MEAT_HEAL / 100.0)
+	return missing
+
+## 优先坐席: round 1 allows swapping at any time, before or after acting.
+static func free_first_swap(state: BattleState) -> bool:
+	return state.round == 1 and "优先坐席" in state.troop.relics
+
+## 精锐运输队: one more distinct rest option at every rest site.
+static func rest_picks(troop: TroopState) -> int:
+	return 2 if "精锐运输队" in troop.relics else 1
+
+static func rest_heal_percent(troop: TroopState) -> int:
+	return REST_HEAL + (COOKING_HEAL if "料理道具" in troop.relics else 0)
+
+## 葫芦型黄金像: every shell gain, relic-granted ones included.
+static func gold_bonus(troop: TroopState) -> int:
+	return GOURD_GOLD if "葫芦型黄金像" in troop.relics else 0
+
+## 向日葵型黄金像: newly obtained cards only; duplicates turning into stars and hatching do not count.
+static func card_gold(troop: TroopState) -> int:
+	return SUNFLOWER_GOLD if "向日葵型黄金像" in troop.relics else 0
 
 static func shop_discount(troop: TroopState) -> float:
 	return 0.5 if "邦奥佩塔之证Ａ" in troop.relics else 1.0
@@ -108,6 +178,11 @@ static func ap_spent(state: BattleState, amount: int) -> void:
 ## One-off effects on acquisition. HP is restored by the run and any active battle.
 static func acquired(troop: TroopState, name: String) -> void:
 	if name == "中元茶泡饭": troop.reset_card_states()
+	elif name == "盆栽型黄金像": troop.add_gold(BONSAI_GOLD)
+	elif name == "求人票":
+		var tree := Engine.get_main_loop() as SceneTree
+		var manager := tree.root.get_node_or_null("BattleManager") if tree != null else null
+		if manager != null: manager.queue_treasures(NORMAL_CHEST, JOB_TICKET_CHESTS)
 
 static func turn_end(state: BattleState) -> void:
 	var actions: Array[Dictionary] = []

@@ -14,6 +14,19 @@ var _relic_chest: RelicChestScreen
 var _upgrade: CardUpgradeScreen
 var _upgrade_layer: CanvasLayer
 var _upgrade_battle_mode := Node.PROCESS_MODE_INHERIT
+## Card chests granted by relics (求人票); each opens once no other screen blocks it.
+var _queued_treasures: Array[int] = []
+
+func queue_treasures(type: int, count: int) -> void:
+	for i: int in range(count): _queued_treasures.append(type)
+	# Open the first right away when possible, so event commands wait for it.
+	_process(0.0)
+
+func _process(_delta: float) -> void:
+	if _queued_treasures.is_empty(): return
+	if is_instance_valid(get_node("/root/ShopManager").active) or is_instance_valid(_relic_chest) or is_instance_valid(_treasure) or is_instance_valid(_upgrade) or is_instance_valid(active) or get_node("/root/ScreenTransition").busy: return
+	var type: int = _queued_treasures.pop_front()
+	launch_treasure(type)
 
 func upgrade_test_cards() -> String:
 	if is_instance_valid(active) or is_instance_valid(_upgrade) or is_instance_valid(_treasure) or is_instance_valid(_relic_chest) or is_instance_valid(get_node("/root/ShopManager").active):
@@ -86,6 +99,7 @@ func register_run(state: TroopState) -> void:
 func clear_run() -> void:
 	# Closing a suspended battle must not advance its map node or award a reward.
 	_run_node_battle = false
+	_queued_treasures.clear()
 	if is_instance_valid(_upgrade): _close_upgrade()
 	close()
 	if is_instance_valid(_relic_chest): _close_relic_chest()

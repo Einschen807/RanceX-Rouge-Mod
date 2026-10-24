@@ -12,6 +12,7 @@ static func resolve(skill_id: int, _context: Dictionary) -> Array[Dictionary]:
 		return [{"kind": "support_add", "support": 90, "target": "self", "stacks": skill_id - 9970}]
 	var commands := DesignedSkillEffects.resolve(skill_id, _context)
 	commands.append_array(DoushinSkillEffects.resolve(skill_id, _context))
+	commands.append_array(RockGSkillEffects.resolve(skill_id, _context))
 	return commands
 
 static func can_use(skill_id: int, context: Dictionary) -> bool:
@@ -32,4 +33,5 @@ static func passive(skill_id: int) -> Dictionary:
 		9214: return {"strategist": 50}
 		9215: return {"strategist": 60}
 		9260: return {"damage_block": 1}
-	return DoushinSkillEffects.passive(skill_id)
+	var rules := DoushinSkillEffects.passive(skill_id)
+	return rules if not rules.is_empty() else RockGSkillEffects.passive(skill_id)

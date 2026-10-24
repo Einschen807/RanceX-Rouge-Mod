@@ -54,7 +54,7 @@ func reset_card_states() -> void:
 
 func add_gold(amount: int) -> void:
 	if amount <= 0: return
-	gold += amount
+	gold += amount + RelicEffects.gold_bonus(self)
 	changed.emit()
 
 static func parse_curse(argument: String) -> Dictionary:
@@ -124,7 +124,8 @@ func owned_version(display_name: String) -> String:
 	if has_card(base + CardCatalog.UPGRADE_SUFFIX): return base + CardCatalog.UPGRADE_SUFFIX
 	return base if has_card(base) else ""
 
-func acquire_card(display_name: String) -> void:
+## reward=false for cards that are not a reward (egg hatching): no 向日葵型黄金像 shells.
+func acquire_card(display_name: String, reward := true) -> void:
 	var card := catalog.find_name(display_name)
 	if card.is_empty(): return
 	var owned := owned_version(display_name)
@@ -132,6 +133,7 @@ func acquire_card(display_name: String) -> void:
 		upgrade_card(owned)
 		return
 	available.append(card)
+	if reward: add_gold(RelicEffects.card_gold(self))
 	# Newly obtained cards remain in inventory, without deploying a leader.
 	changed.emit()
 

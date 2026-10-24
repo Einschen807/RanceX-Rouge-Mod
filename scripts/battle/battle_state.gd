@@ -176,6 +176,7 @@ func swap_remaining() -> int:
 	return maxi(0, next_swap_round - round)
 
 func can_swap() -> bool:
+	if phase == "player" and RelicEffects.free_first_swap(self): return true
 	return phase == "preparation" or (phase == "player" and round > 1 and not player_has_acted and round >= next_swap_round)
 
 func sync_formation(previous_leaders: Array[String] = []) -> void:
@@ -511,7 +512,9 @@ func damage_breakdown(side: String, skill: Dictionary, command: Dictionary) -> D
 	additional_damage += BattleLeaderPassives.total(self, side, 9 if kind == "magic" else 8) / 100.0
 	additional_damage += (BattleSupports.strategist(self, side) - BattleSupports.strategist(self, "enemy" if side == "player" else "player")) / 100.0
 	additional_damage += BattleStatusEffects.outgoing_ratio(statuses(side)) - 1.0
-	additional_damage += BattleStatusEffects.incoming_ratio(statuses(target_side), command.get("elements", int(command.get("element", 0)))) - 1.0
+	var hit_elements: Variant = command.get("elements", int(command.get("element", 0)))
+	additional_damage += BattleStatusEffects.incoming_ratio(statuses(target_side), hit_elements) - 1.0
+	additional_damage += RelicEffects.amulet_rate(self, side, target_side, hit_elements if hit_elements is Array else [int(hit_elements)])
 	additional_damage += BattleLeaderPowers.extra_rate(self, side, skill, command) / 100.0
 	# Read the live count before this impact increments it: later hits benefit too.
 	if side == "player" and not self_target: additional_damage += combo * 0.1
@@ -520,6 +523,8 @@ func damage_breakdown(side: String, skill: Dictionary, command: Dictionary) -> D
 	var cap := int(monster.get("damage_cap", 0))
 	if target_side == "enemy" and cap > 0:
 		damage = minf(damage, enemy_max_hp * cap / 100.0)
+	if not self_target and damage > 0.0 and BattleSupports.has_hard_shell(self, target_side):
+		damage = 1.0
 	var breaker: bool = RelicEffects.can_break_barrier(self, side, command)
 	return {"base_damage": base_damage, "extra_damage_rate": additional_damage * 100.0, "base_resistance": base_resistance, "extra_resistance": additional_resistance, "unblocked_damage": damage, "damage": 0.0 if not breaker and not BattleSupports.effects(self, target_side, BattleSupports.BARRIER).is_empty() else damage}
 
@@ -554,12 +559,16 @@ func _apply(side: String, skill: Dictionary, commands: Array) -> void:
 					log_message("%s的攻击未命中" % ("联合部队" if side == "player" else monster.name))
 					continue
 				if BattleSupports.absorb(self, target_side, command, amount): continue
+				if not self_target and amount > 0.0 and BattleSupports.has_hard_shell(self, target_side):
+					BattleSupports.spend_hard_shell(self, target_side)
 				amount = BattleShields.absorb(self, target_side, amount)
 				var remaining_hp := maxf(0.0, (player_hp if player_target else enemy_hp) - amount)
 				# Decimal combo rates can leave floating-point dust on an exact lethal hit.
 				if is_zero_approx(remaining_hp): remaining_hp = 0.0
 				if player_target:
 					player_hp = remaining_hp
+					# Revive before later hits of the same skill land.
+					if player_hp <= 0.0: RelicEffects.revive(self)
 				else:
 					enemy_hp = remaining_hp
 					if hp_before > 0.0 and enemy_hp <= 0.0: _lethal_skill = int(skill.id)
@@ -686,6 +695,7 @@ func lose_hp(side: String, percent: float, command: Dictionary = {}) -> float:
 	if side == "player":
 		player_hp -= amount
 		player_damage_total += amount
+		if player_hp <= 0.0: RelicEffects.revive(self)
 	else:
 		enemy_hp -= amount
 		enemy_damage_total += amount
@@ -888,7 +898,7 @@ func _log_damage(side: String, amount: float) -> void:
 func _check_result() -> void:
 	if enemy_hp <= 0:
 		outcome = "胜利"
-	elif player_hp <= 0:
+	elif player_hp <= 0 and not RelicEffects.revive(self):
 		outcome = "败北"
 	if not outcome.is_empty():
 		phase = "result"

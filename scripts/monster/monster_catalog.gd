@@ -72,7 +72,7 @@ func load_catalog(skills: Dictionary, monster_path: String = "res://data/monster
 		if monster.damage_cap < 0 or monster.damage_cap > 100:
 			errors.append("怪物限伤必须为0～100的整数：" + monster.identity)
 			continue
-		if monster.identity.is_empty() or monsters.has(monster.identity) or monster.name.is_empty() or monster.base_hp <= 0 or monster.base_at < 0 or monster.physical_resist < 0 or monster.physical_resist > 100 or monster.magic_resist < 0 or monster.magic_resist > 100 or monster.kind not in [1, 2, 3] or not behaviors.has(monster.behavior):
+		if monster.identity.is_empty() or monsters.has(monster.identity) or monster.name.is_empty() or monster.base_hp <= 0 or monster.base_at < 0 or monster.physical_resist < -100 or monster.physical_resist > 100 or monster.magic_resist < -100 or monster.magic_resist > 100 or monster.kind not in [1, 2, 3] or not behaviors.has(monster.behavior):
 			errors.append("怪物识别名重复或字段无效：" + monster.identity)
 			continue
 		if not ResourceLoader.exists("res://assets/monsters/%s.png" % monster.portrait) or not ResourceLoader.exists("res://assets/battle/backgrounds/%s.png" % monster.background):

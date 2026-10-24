@@ -54,6 +54,7 @@ func _process(_delta: float) -> void:
 		var icon: RelicIcon = icons[name]
 		icon.counter = int(troop.relic_counters.get(name, 0)) if troop != null and RelicEffects.PERIODS.has(name) else -1
 		icon.imminent = RelicEffects.PERIODS.has(name) and icon.counter == int(RelicEffects.PERIODS[name]) - 1
+		icon.spent = troop != null and RelicEffects.spent(troop, name)
 		icon.queue_redraw()
 	var modal := get_tree().get_first_node_in_group("modal_overlay")
 	root.visible = in_game and not get_tree().get_nodes_in_group("modal_overlay").any(func(node: Node) -> bool: return node is RelicEncyclopedia)

@@ -22,7 +22,7 @@ func _ready() -> void:
 	_label.add_theme_color_override("default_color", Color("f2ecda"))
 	add_child(_label)
 	var lines := description.split("\n", true, 1)
-	_label.push_color(Color("ebcf73"))
+	_label.push_color(FormationArt.GOLD)
 	_label.add_text(lines[0])
 	_label.pop()
 	if lines.size() > 1: _label.add_text("\n" + lines[1])

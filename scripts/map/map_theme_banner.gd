@@ -25,7 +25,7 @@ func _ready() -> void:
 	bar.offset_bottom = 110.0
 	var floor_label := _label(bar, "第%d层" % floor_number, 34, Color("a7d3db"), 22.0, 65.0)
 	floor_label.name = "Floor"
-	var theme_label := _label(bar, map_theme, 84, Color("f0cf6b"), 66.0, 181.0)
+	var theme_label := _label(bar, map_theme, 84, FormationArt.GOLD, 66.0, 181.0)
 	theme_label.name = "Theme"
 	modulate.a = 0.0
 	_tween = create_tween()

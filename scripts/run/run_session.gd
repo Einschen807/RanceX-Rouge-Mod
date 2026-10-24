@@ -341,7 +341,7 @@ func complete_node() -> void:
 func battle_won(player_hp: float, max_hp: float) -> void:
 	if pending.get("battle_rewarded", false): return
 	pending["battle_rewarded"] = true
-	missing_hp = maxf(0.0, max_hp - player_hp)
+	missing_hp = RelicEffects.victory_missing_hp(troop, player_hp, max_hp)
 	beaten[pending.monster] = true
 	if pending.type == "monster": normal_battles[act] += 1
 	changed.emit()
@@ -351,14 +351,14 @@ func heal(percent: int) -> void:
 	changed.emit()
 
 func recover_at_rest() -> void:
-	heal(30)
+	heal(RelicEffects.rest_heal_percent(troop))
 
 ## Rest option: every held egg hatches at once; returns the cards obtained.
 func hatch_eggs_at_rest() -> Array[String]:
 	var hatched: Array[String] = []
 	for egg: String in RelicEffects.held_eggs(troop):
 		troop.remove_relic(egg)
-		troop.acquire_card(RelicEffects.EGGS[egg])
+		troop.acquire_card(RelicEffects.EGGS[egg], false)
 		hatched.append(RelicEffects.EGGS[egg])
 	changed.emit()
 	return hatched

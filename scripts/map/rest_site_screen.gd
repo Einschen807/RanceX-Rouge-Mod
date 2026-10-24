@@ -23,6 +23,9 @@ const SOUNDS := {
 }
 var session: Node
 var upgrade_count := 1
+## Options already taken at this rest site and how many it allows (精锐运输队: 2, distinct).
+var used: Array = []
+var picks := 1
 var finished := false
 var _options: Array[Control] = []
 var _lights: Array[Sprite2D] = []
@@ -148,9 +151,10 @@ func _refresh_hp() -> void:
 
 func _option_specs() -> Array[Dictionary]:
 	var maximum: float = session.troop.total("hp")
-	var heal_amount := minf(maximum * 0.3, maximum - float(session.hp()))
+	var heal_percent := RelicEffects.rest_heal_percent(session.troop)
+	var heal_amount := minf(maximum * heal_percent / 100.0, maximum - float(session.hp()))
 	var specs: Array[Dictionary] = [
-		{"id": "heal", "title": "休息", "icon": "res://assets/formation/bonus_symbol_8.png", "text": "恢复最大生命值的30%%\n（+%d）" % floori(heal_amount)},
+		{"id": "heal", "title": "休息", "icon": "res://assets/formation/bonus_symbol_8.png", "text": "恢复最大生命值的%d%%\n（+%d）" % [heal_percent, floori(heal_amount)]},
 		{"id": "upgrade", "title": "锻炼", "icon": "res://assets/formation/bonus_symbol_12.png", "text": "强化%d张卡牌" % upgrade_count},
 		{"id": "reset", "title": "整备", "icon": "res://assets/formation/bonus_symbol_5.png", "text": "重置所有卡牌状态\n使用次数与AP累计复原"},
 	]
@@ -169,9 +173,19 @@ func _build_options() -> void:
 	var left := (1920.0 - width) / 2.0
 	for i: int in range(specs.size()):
 		var option := _option(specs[i], Vector2(left + i * (OPTION_SIZE.x + gap), 790))
+		if String(specs[i].id) in used: option.disabled = true
 		_options.append(option)
-	var hint := BattleArt.label(self, "所有选项都会结束本次休整　·　右键返回地图", Vector2(460, 1040), Vector2(1000, 34), 20, Color(0.85, 0.8, 0.7, 0.75), HORIZONTAL_ALIGNMENT_CENTER)
+	var left_picks := remaining_picks()
+	var rule := "所有选项都会结束本次休整" if picks <= 1 else ("还可选择%d个不同选项" % left_picks if left_picks > 1 else "再选择1个选项后结束本次休整")
+	var hint := BattleArt.label(self, rule + "　·　右键返回地图", Vector2(460, 1040), Vector2(1000, 34), 20, Color(0.85, 0.8, 0.7, 0.75), HORIZONTAL_ALIGNMENT_CENTER)
 	hint.name = "Hint"
+
+func remaining_picks() -> int:
+	return maxi(0, picks - used.size())
+
+## Used options stay visible but dimmed.
+func _option_alpha(option: Control) -> float:
+	return 0.3 if (option as Button).disabled else 1.0
 
 func _option(spec: Dictionary, at: Vector2) -> Button:
 	var button := Button.new()
@@ -227,7 +241,7 @@ func _option(spec: Dictionary, at: Vector2) -> Button:
 	return button
 
 func _hover(button: Button, active: bool) -> void:
-	if finished: return
+	if finished or button.disabled: return
 	var tween := button.create_tween().set_parallel(true)
 	tween.tween_property(button, "scale", Vector2.ONE * (1.06 if active else 1.0), 0.12).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	tween.tween_property(button, "modulate", Color(1.12, 1.05, 0.92) if active else Color.WHITE, 0.12)
@@ -240,18 +254,26 @@ func _play_intro() -> void:
 		if not node is CanvasItem: continue
 		var item := node as CanvasItem
 		var delay := 0.0
-		if item in _options:
+		var alpha := 1.0
+		if item is Control and item in _options:
 			delay = 0.25 + 0.07 * _options.find(item)
+			alpha = _option_alpha(item as Control)
 			var target := (item as Control).position.y
 			(item as Control).position.y += 40
 			tween.tween_property(item, "position:y", target, 0.32).set_delay(delay).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 		elif item is Sprite2D:
 			continue # Lights fade in through _process.
-		tween.tween_property(item, "modulate:a", 1.0, 0.35).set_delay(delay)
-	if not _options.is_empty(): _options[0].grab_focus.call_deferred()
+		tween.tween_property(item, "modulate:a", alpha, 0.35).set_delay(delay)
+	_focus_first()
+
+func _focus_first() -> void:
+	for option: Control in _options:
+		if not (option as Button).disabled:
+			option.grab_focus.call_deferred()
+			return
 
 func _choose(id: String, button: Button) -> void:
-	if finished: return
+	if finished or id in used: return
 	if id != "upgrade":
 		finished = true
 		for option: Control in _options:
@@ -319,17 +341,40 @@ func play_completion(id: String, info: Dictionary) -> void:
 				plus.pivot_offset = plus.size / 2.0
 				_completion.tween_property(plus, "scale", Vector2.ONE * 1.35, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 				_completion.tween_property(plus, "scale", Vector2.ONE, 0.3).set_delay(0.3)
-			_completion.tween_callback(_burst.bind(center + Vector2(0, -20), FormationArt.GOLD)).set_delay(0.15)
+			_completion.tween_callback(_burst.bind(center + Vector2(0, -20), FormationArt.ORNAMENT_GOLD)).set_delay(0.15)
 			var grown: Array = info.get("names", [])
 			for n: int in range(grown.size()):
 				_caption("成长为「%s」" % grown[n], CAPTION_AT + Vector2(0, n * 48), FormationArt.GOLD, 0.3 + n * 0.12)
 	_completion.chain().tween_interval(0.55)
-	_completion.chain().tween_callback(_continue)
+	_completion.chain().tween_callback(_after_completion)
 
-## Back during the completion skips straight to the map.
+## Back during the completion skips straight to the map, or to the next pick.
 func skip_completion() -> void:
 	if _completion != null and _completion.is_valid(): _completion.kill()
-	_continue()
+	_after_completion()
+
+func _after_completion() -> void:
+	if remaining_picks() > 0: _reopen()
+	else: _continue()
+
+## 精锐运输队: rebuild the cards (HP and available actions may have changed) for the next pick.
+func _reopen() -> void:
+	finished = false
+	for option: Control in _options:
+		remove_child(option)
+		option.queue_free()
+	_options.clear()
+	var hint := get_node_or_null("Hint")
+	if hint != null:
+		remove_child(hint)
+		hint.queue_free()
+	_build_options()
+	_refresh_hp()
+	var tween := create_tween().set_parallel(true)
+	for option: Control in _options:
+		option.modulate.a = 0.0
+		tween.tween_property(option, "modulate:a", _option_alpha(option), 0.25)
+	_focus_first()
 
 func _continue() -> void:
 	if _continued: return
@@ -363,7 +408,7 @@ func _wash(color: Color) -> ColorRect:
 func _ring(at: Vector2, delay: float) -> void:
 	var ring := Line2D.new()
 	ring.width = 5.0
-	ring.default_color = Color(FormationArt.GOLD, 0.0)
+	ring.default_color = Color(FormationArt.ORNAMENT_GOLD, 0.0)
 	ring.material = _additive()
 	for n: int in range(49):
 		var a := TAU * n / 48.0

@@ -18,7 +18,7 @@ func _ready() -> void:
 	var background := ShaderMaterial.new()
 	background.shader = preload("res://shaders/analysis_panel.gdshader")
 	material = background
-	var title := _text(self, "状态", Vector2(26, 20), Vector2(340, 34), 25, Color("fff479"))
+	var title := _text(self, "状态", Vector2(26, 20), Vector2(340, 34), 25, FormationArt.GOLD)
 	title.add_theme_constant_override("outline_size", 4)
 	_ability_tab = BattleArt.text_button(self, "能力", Vector2(26, 62), Vector2(162, 56), func() -> void: select_page("ability"))
 	_ability_tab.name = "AbilityTab"
@@ -80,7 +80,7 @@ func refresh_entries() -> void:
 		heading.name = "Heading"
 		heading.add_theme_constant_override("separation", 10)
 		row.add_child(heading)
-		var title := _text(heading, record.name, Vector2.ZERO, Vector2.ZERO, 21, Color("fff479"))
+		var title := _text(heading, record.name, Vector2.ZERO, Vector2.ZERO, 21, FormationArt.GOLD)
 		title.name = "Title"
 		title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

@@ -2,7 +2,6 @@ extends Control
 class_name RunMapScreen
 signal close_requested
 const INK := Color("523921")
-const GOLD := Color("e8cb84")
 var session: Node
 var scroll: ScrollContainer
 var sheet: Control
@@ -284,6 +283,8 @@ func _rest_screen() -> void:
 	var screen := RestSiteScreen.new()
 	screen.session = session
 	screen.upgrade_count = maxi(1, int(session.pending.get("upgrade_count", 1)))
+	screen.used = session.pending.get("rest_used", [])
+	screen.picks = RelicEffects.rest_picks(session.troop)
 	screen.action_selected.connect(_rest_action.bind(screen))
 	# Completion effects end with a black transition back to the map.
 	screen.continue_requested.connect(func() -> void: get_node("/root/ScreenTransition").play(_finish_node))
@@ -307,7 +308,17 @@ func _rest_action(id: String, screen: RestSiteScreen) -> void:
 		"upgrade":
 			_training_screen(screen.upgrade_count)
 			return
+	_mark_rest_used(id)
+	screen.used = session.pending.rest_used
 	screen.play_completion(id, info)
+
+## 精锐运输队 allows a second, different rest option; the taken ones live on the pending node.
+func _mark_rest_used(id: String) -> void:
+	if not session.pending.has("rest_used"): session.pending["rest_used"] = []
+	if id not in session.pending.rest_used: session.pending.rest_used.append(id)
+
+func _rest_picks_left() -> int:
+	return RelicEffects.rest_picks(session.troop) - session.pending.get("rest_used", []).size()
 
 func _training_screen(count: int) -> void:
 	_clear_modal()
@@ -316,7 +327,10 @@ func _training_screen(count: int) -> void:
 	screen.remaining = count
 	screen.rest_mode = true
 	screen.fade_out = true # The forge finishes under a black transition.
-	screen.completed.connect(_finish_node)
+	screen.completed.connect(func() -> void:
+		_mark_rest_used("upgrade")
+		if _rest_picks_left() > 0: _rest_screen()
+		else: _finish_node())
 	screen.cancelled.connect(func() -> void:
 		_clear_modal()
 		_rest_screen())
@@ -366,7 +380,7 @@ func _dialog(title: String, text: String, kind: String, dimensions := Vector2(68
 	panel.add_theme_stylebox_override("panel", BattleArt.panel_style())
 	_modal.add_child(panel)
 	_modal_body = panel
-	var heading := FormationArt.label(panel, title, Vector2(35, 12), Vector2(dimensions.x - 70, 44), 32, GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+	var heading := FormationArt.label(panel, title, Vector2(35, 12), Vector2(dimensions.x - 70, 44), 32, FormationArt.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
 	heading.name = "Heading"
 	var body := FormationArt.label(panel, text, Vector2(50, 110), Vector2(dimensions.x - 100, 90), 24, Color("eee2ca"), HORIZONTAL_ALIGNMENT_CENTER)
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

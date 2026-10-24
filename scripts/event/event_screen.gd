@@ -47,7 +47,7 @@ func _ready() -> void:
 	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	content.add_theme_constant_override("separation", 24)
 	scroll.add_child(content)
-	var title := _label(record.get("title", "旅途片刻"), 40, Color("ebcf73"))
+	var title := _label(record.get("title", "旅途片刻"), 40, FormationArt.GOLD)
 	title.name = "EventTitle"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	content.add_child(title)

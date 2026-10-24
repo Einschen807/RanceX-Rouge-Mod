@@ -7,6 +7,13 @@ const INTENT_LEFT := 491.0
 const INTENT_RIGHT := 836.0
 const HP_TRAIL_HOLD := 0.40
 const HP_TRAIL_CATCH_UP := 0.18
+## Monsters whose portrait plays the original enemy-formation flat; listed layers stay hidden.
+## Rock G keeps its own purple backdrop, as in the original battle.
+## Monster portrait animations always run at fixed 1x, independent of the battle speed setting.
+const NATIVE_MONSTERS := {
+	"宝箱团子": {"folder": "monster_treasure", "hidden": ["Ｃ／背景", "样本背景.png", "Ｇ／色彩渐变.png"]},
+	"岩石G": {"folder": "monster_rock_g", "hidden": []},
+}
 signal close_requested
 var battle: BattleState
 var speed := 3
@@ -223,10 +230,12 @@ func _build() -> void:
 	stage.clip_contents = true
 	stage.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(stage)
-	if battle.monster.portrait == "宝箱团子":
+	if NATIVE_MONSTERS.has(battle.monster.portrait):
+		var native_config: Dictionary = NATIVE_MONSTERS[battle.monster.portrait]
 		var native := OriginalFlatPlayer.new()
-		native.hidden_libraries = ["Ｃ／背景", "样本背景.png", "Ｇ／色彩渐变.png"]
-		native.animation_path = "res://assets/battle/native/monster_treasure/animation.json"
+		native.hidden_libraries = PackedStringArray(native_config.hidden)
+		native.animation_path = "res://assets/battle/native/%s/animation.json" % native_config.folder
+		native.set_meta("fixed_ui_speed", true)
 		stage.add_child(native)
 	else:
 		var portrait := TextureRect.new()
@@ -744,8 +753,6 @@ func _apply_speed(node: Node) -> void:
 		node.speed_scale = animation_speed()
 	for child: Node in node.get_children():
 		_apply_speed(child)
-	if _breath != null:
-		_breath.set_speed_scale(animation_speed())
 
 func _cycle_speed() -> void:
 	speed = speed % 3 + 1
@@ -928,8 +935,8 @@ func _show_analysis() -> void:
 	background.shader = preload("res://shaders/analysis_panel.gdshader")
 	frame.material = background
 	var monster: Dictionary = battle.monster
-	_analysis_text(frame, "MonsterName", monster.name, Vector2(26, 20), Vector2(340, 34), 25, Color("fff479"), 4)
-	_analysis_text(frame, "MonsterKind", ["普通怪", "精英怪", "BOSS"][monster.kind - 1], Vector2(26, 62), Vector2(340, 32), 23, Color("fff479"), 4)
+	_analysis_text(frame, "MonsterName", monster.name, Vector2(26, 20), Vector2(340, 34), 25, FormationArt.GOLD, 4)
+	_analysis_text(frame, "MonsterKind", ["普通怪", "精英怪", "BOSS"][monster.kind - 1], Vector2(26, 62), Vector2(340, 32), 23, FormationArt.GOLD, 4)
 	_analysis_text(frame, "Stats", "基础 AT\n物理抗性\n魔法抗性\n限伤", Vector2(26, 116), Vector2(140, 124), 21)
 	var cap := int(monster.get("damage_cap", 0))
 	var cap_text := "%d%%" % cap if cap > 0 else "不限伤"

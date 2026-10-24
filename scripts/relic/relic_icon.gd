@@ -3,6 +3,8 @@ class_name RelicIcon
 var record: Dictionary
 var counter := -1
 var imminent := false
+## Once-per-run relics that already fired stay on the bar, dimmed.
+var spent := false
 var _clock := 0.0
 var _flash := 0.0
 var _texture: Texture2D
@@ -66,6 +68,7 @@ func _process(delta: float) -> void:
 	if imminent: white = (sin(_clock * TAU / 0.9 - PI * 0.5) * 0.5 + 0.5)
 	elif _flash > 0.0: white = sin(PI * (1.0 - _flash / 0.7))
 	if _material != null: _material.set_shader_parameter("white_amount", white)
+	if _visual != null: _visual.self_modulate = Color(0.4, 0.4, 0.4) if spent else Color.WHITE
 
 func flash() -> void:
 	_flash = 0.7
