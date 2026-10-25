@@ -29,7 +29,7 @@ static func _offer(kind: String, id: String, base: int, variation: float, unavai
 	return {"kind": kind, "id": id, "base": base, "variation": variation, "sold": false, "unavailable": unavailable}
 
 static func price(offer: Dictionary, troop: TroopState) -> int:
-	return maxi(1, roundi(float(offer.base) * (1.0 + float(offer.variation)) * RelicEffects.shop_discount(troop)))
+	return maxi(1, roundi(float(offer.base) * (1.0 + float(offer.variation)) * RelicEffects.shop_discount(troop) * CurseEffects.shop_rate(troop)))
 
 static func buy(stock: Dictionary, index: int, troop: TroopState, at: Vector2) -> String:
 	if index < 0 or index >= stock.items.size(): return "商品不存在。"

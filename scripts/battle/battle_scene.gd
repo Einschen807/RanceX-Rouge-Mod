@@ -13,6 +13,7 @@ const HP_TRAIL_CATCH_UP := 0.18
 const NATIVE_MONSTERS := {
 	"宝箱团子": {"folder": "monster_treasure", "hidden": ["Ｃ／背景", "样本背景.png", "Ｇ／色彩渐变.png"]},
 	"岩石G": {"folder": "monster_rock_g", "hidden": []},
+	"哈尼": {"folder": "monster_hanny", "hidden": []},
 }
 signal close_requested
 var battle: BattleState
@@ -81,7 +82,7 @@ var _card_views: Dictionary = {}
 func _process(delta: float) -> void:
 	_restore_skill_hover()
 	if not is_instance_valid(_enemy_damage_preview): return
-	if input_locked or battle.phase != "player" or is_instance_valid(popup) or is_instance_valid(formation) or get_tree().get_first_node_in_group("modal_overlay") != null or get_node("/root/ScreenTransition").busy:
+	if input_locked or battle.phase != "player" or is_instance_valid(popup) or is_instance_valid(formation) or _overlay_open() or get_node("/root/ScreenTransition").busy:
 		if not _ap_hover_key.is_empty() or not _pending_damage_preview.is_empty() or _enemy_damage_preview.visible:
 			_clear_skill_preview()
 		return
@@ -99,8 +100,18 @@ func _process(delta: float) -> void:
 	_enemy_number.preview_alpha = alpha
 	if _enemy_shield.preview: _enemy_shield.set_preview(true, false, alpha)
 
+## Modal screens at or above this battle's canvas layer block it. The event page that
+## launched an event battle stays registered as an overlay underneath and must not.
+func _overlay_open() -> bool:
+	var own := _layer_of(self)
+	return get_tree().get_nodes_in_group("modal_overlay").any(func(node: Node) -> bool: return not node is CanvasItem or _layer_of(node) >= own)
+
+static func _layer_of(item: CanvasItem) -> int:
+	var layer := item.get_canvas_layer_node()
+	return layer.layer if layer != null else 0
+
 func _restore_skill_hover() -> void:
-	if not _pointer_known or not is_instance_valid(_cards) or input_locked or battle.phase != "player" or is_instance_valid(popup) or is_instance_valid(formation) or get_tree().get_first_node_in_group("modal_overlay") != null or get_node("/root/ScreenTransition").busy: return
+	if not _pointer_known or not is_instance_valid(_cards) or input_locked or battle.phase != "player" or is_instance_valid(popup) or is_instance_valid(formation) or _overlay_open() or get_node("/root/ScreenTransition").busy: return
 	if operation_mode == 1: _hover_card(_pointer_position)
 	var hovered: OriginalUiButton
 	var actor := ""
@@ -642,7 +653,7 @@ func _preview_skill_ap(actor: String, id: int, slot: int, entered: bool) -> void
 			_clear_skill_preview()
 		return
 	_clear_skill_preview()
-	if input_locked or is_instance_valid(popup) or is_instance_valid(formation) or get_tree().get_first_node_in_group("modal_overlay") != null or get_node("/root/ScreenTransition").busy or not battle.can_use(actor, id, slot): return
+	if input_locked or is_instance_valid(popup) or is_instance_valid(formation) or _overlay_open() or get_node("/root/ScreenTransition").busy or not battle.can_use(actor, id, slot): return
 	_ap_hover_key = key
 	_ap.set_preview(battle.runtime.ap_cost(actor, battle.troop.catalog.skills[id], slot))
 	if _enemy_hp_trail_animating() or _enemy_shield.is_animating():
@@ -1001,7 +1012,7 @@ func _analysis_text(parent: Control, title: String, text: String, at: Vector2, d
 	return label
 
 func _show_state_panel() -> void:
-	if input_locked or is_instance_valid(formation) or battle.phase == "result" or get_tree().get_first_node_in_group("modal_overlay") != null or get_node("/root/ScreenTransition").busy: return
+	if input_locked or is_instance_valid(formation) or battle.phase == "result" or _overlay_open() or get_node("/root/ScreenTransition").busy: return
 	if is_instance_valid(state_panel):
 		_close_state_panel()
 		return
@@ -1058,7 +1069,7 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion or event is InputEventMouseButton:
 		_pointer_position = get_global_transform().affine_inverse() * event.position
 		_pointer_known = true
-	if get_tree().get_first_node_in_group("modal_overlay") != null or is_instance_valid(formation):
+	if _overlay_open() or is_instance_valid(formation):
 		return
 	if event is InputEventMouseMotion and operation_mode == 1 and not input_locked and not is_instance_valid(popup) and battle.phase == "player":
 		_hover_card(get_global_transform().affine_inverse() * event.position)

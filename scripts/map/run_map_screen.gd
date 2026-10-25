@@ -14,6 +14,7 @@ var _formation: TroopFormation
 var _card_choices: Array = []
 var _modal_kind := ""
 var _launching := false
+var _opening_event := false
 var _pan_armed := false
 var _panning := false
 var _pan_origin := Vector2.ZERO
@@ -214,7 +215,7 @@ func _show_pending() -> void:
 			_show_loot(1, false)
 		"rest": _rest_screen()
 		"shop": _shop_screen()
-		"unknown": _event_screen()
+		"unknown": _open_event()
 
 func _start_floor() -> void:
 	_starting_floor = true
@@ -338,13 +339,25 @@ func _training_screen(count: int) -> void:
 	_modal_kind = "training"
 	add_child(screen)
 
+## Events open and close under a black fade. A blackout already running (continuing a save)
+## covers the swap by itself, so the page opens beneath it without a second fade.
+func _open_event() -> void:
+	if _opening_event: return
+	var transition := get_node("/root/ScreenTransition")
+	if transition.busy:
+		_event_screen()
+		return
+	_opening_event = true
+	await transition.play(_event_screen)
+	_opening_event = false
+
 func _event_screen() -> void:
 	_clear_modal()
 	_modal_kind = "event"
 	var page := EventScreen.new()
 	page.session = session
 	page.record = session.current_event()
-	page.completed.connect(_finish_node)
+	page.completed.connect(func() -> void: get_node("/root/ScreenTransition").play(_finish_node))
 	_modal = page
 	add_child(page)
 
@@ -443,7 +456,7 @@ func _close_formation() -> void:
 		_refresh_hud())
 
 func _end_screen(won: bool) -> void:
-	_dialog("行军完成" if won else "部队败北", "四层首领均已击破。" if won else "可以从当前节点入口重新出发。", "end", Vector2(680, 460))
+	_dialog("通关" if won else "部队败北", "四层首领均已击破。" if won else "可以从当前节点入口重新出发。", "end", Vector2(680, 460))
 	if not won:
 		_action("重试本节点", Vector2(240, 220), func() -> void:
 			if not session.resume():

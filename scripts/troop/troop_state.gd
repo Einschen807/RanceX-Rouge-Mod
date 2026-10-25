@@ -10,6 +10,8 @@ var relics: Array[String] = []
 var relic_counters: Dictionary = {}
 ## Run curses persist across battles, separately from combat status ailments.
 var curses: Array[Dictionary] = []
+## Percentage points of HP增加率 granted by events (`maxhp`), kept for the whole run.
+var max_hp_bonus := 0
 var catalog: CardCatalog
 var available: Array[Dictionary] = []
 var leaders: Array[String] = ["", "", "", "", "", "", ""]
@@ -57,18 +59,19 @@ func add_gold(amount: int) -> void:
 	gold += amount + RelicEffects.gold_bonus(self)
 	changed.emit()
 
-static func parse_curse(argument: String) -> Dictionary:
-	var parts := argument.split("|", true, 1)
-	var name := parts[0].strip_edges()
-	if name.is_empty(): return {}
-	return {"name": name, "description": parts[1].strip_edges().replace("r", "\n") if parts.size() == 2 else ""}
-
-func acquire_curse(display_name: String, description := "") -> bool:
-	var name := display_name.strip_edges()
-	if name.is_empty() or curses.any(func(record: Dictionary) -> bool: return record.name == name): return false
-	curses.append({"name": name, "description": description})
+## Curses come only from data/curses.txt; a held curse is not gained twice.
+func acquire_curse(display_name: String) -> bool:
+	var record: Dictionary = CurseCatalog.shared().by_name.get(display_name.strip_edges(), {})
+	if record.is_empty() or CurseEffects.held(self, record.name): return false
+	curses.append({"name": record.name, "description": record.description})
 	changed.emit()
 	return true
+
+## Event 「maxhp」 raises the persistent HP增加率 by whole percentage points.
+func add_max_hp_bonus(percent: int) -> void:
+	if percent <= 0: return
+	max_hp_bonus += percent
+	changed.emit()
 
 func spend_gold(amount: int) -> bool:
 	if amount < 0 or gold < amount: return false
@@ -329,7 +332,7 @@ func rate(kind: String) -> float:
 	var all := 3.0 * (int(bonuses.get(12, false)) + int(bonuses.get(13, false)))
 	var value := 0.0
 	match kind:
-		"hp": value = all + (30.0 if bonuses.get(8, false) else 0.0)
+		"hp": value = all + (30.0 if bonuses.get(8, false) else 0.0) + float(max_hp_bonus)
 		"physical": value = float(damage_rates.physical) + all + (30.0 if bonuses.get(9, false) else 0.0)
 		"magic": value = float(damage_rates.magic) + all + (30.0 if bonuses.get(10, false) else 0.0)
 		"physical_resist": value = float(resistance_rates.physical)

@@ -29,13 +29,19 @@ func launch(identity: String, definition_path := "res://data/events.txt") -> Str
 	_layer = CanvasLayer.new()
 	_layer.layer = 15
 	add_child(_layer)
+	# The page opens, and later closes, under a black fade like a map event.
+	var transition := get_node("/root/ScreenTransition")
+	transition.play(_mount.bind(next))
+	return "进入事件：" + identity
+
+func _mount(session: ForcedEventSession) -> void:
+	if session != context or not is_instance_valid(_layer): return
 	active = EventScreen.new()
 	active.session = context
 	active.record = context.current_event()
 	active.add_to_group("modal_overlay")
-	active.completed.connect(clear)
+	active.completed.connect(func() -> void: get_node("/root/ScreenTransition").play(clear))
 	_layer.add_child(active)
-	return "进入事件：" + identity
 
 func current_session() -> Node:
 	return context if is_instance_valid(context) and context.active else get_node("/root/RunSession")

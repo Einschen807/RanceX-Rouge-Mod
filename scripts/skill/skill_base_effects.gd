@@ -4,11 +4,12 @@ class_name SkillBaseEffects
 ## Resolution returns commands to a future battle consumer, and never reads description text.
 
 static func has_effect(id: int) -> bool:
-	return id in range(0, 10) or id in range(30, 37) or id in range(40, 55) or BattleStatusEffects.valid(id)
+	return id in range(0, 10) or id in range(30, 37) or id in range(40, 56) or BattleStatusEffects.valid(id)
 
 static func valid_value(id: int, value: int) -> bool:
 	if id in [3, 4]: return true
 	if id == 45: return value >= 1
+	if id == 55: return value != 0 and absi(value) <= 10
 	if id in [46, 47]: return absi(value) < 2000 and absi(value) % 1000 <= 100
 	if id == 48: return SkillElements.valid(value)
 	if id == 49: return value in [0, 1]
@@ -49,6 +50,9 @@ static func resolve(skill: Dictionary, context: Dictionary) -> Array[Dictionary]
 			commands.append({"kind": "down", "selector": value, "target": "self"})
 		elif effect == 45:
 			commands.append({"kind": "cleanse", "count": value, "target": "self"})
+		elif effect == 55:
+			# AP消灭: positive values act on the caster's side, negative on the opponent.
+			commands.append({"kind": "ap_destroy", "amount": absi(value), "target": "self" if value > 0 else "opponent"})
 		elif effect in [46, 47]:
 			commands.append({"kind": "hp_fraction", "basis": "current" if effect == 46 else "missing", "lose": absi(value) >= 1000, "percent": absi(value) % 1000, "target": "self" if value >= 0 else "opponent"})
 		elif effect == 50:

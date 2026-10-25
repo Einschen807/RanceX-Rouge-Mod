@@ -6,21 +6,26 @@ var history: Array[String] = []
 var history_index := 0
 const HELP_TEXT := """可用命令：
 help — 显示全部命令
-travel — 切换自由行军，开启后可进入当前楼层任意节点
+travel — 切换自由移动，开启后可进入当前楼层任意节点
 shop — 打开商店
 gold 数量 — 添加贝壳（正整数）
+pay 数量 — 支付贝壳（正整数，不足时失败）
 heal 百分比 — 恢复部队最大HP的1～100%
+hurt 百分比 — 失去最大HP的1～99%，至少保留1点HP
 battle 怪物识别名 — 进入指定战斗
 event 事件名 — 强制进入指定事件，无视出现条件与地图层数
 treasure 0|1|2|3 — 打开对应类型的卡牌宝箱
 relic [遗物池名称] — 打开遗物宝箱，省略池名使用默认遗物池
 add relic 遗物名称 — 获得指定遗物
+choose relic 名称|名称|… — 从列出的未持有遗物中选择1件
+random relic 数量 名称|名称|… — 从列出的未持有遗物中随机获得指定数量
 delet relic 遗物名称 — 删除持有遗物（也支持 delete relic）
 add card 卡牌名称 — 获得卡牌，首次重复强化，之后每次等级+5
 upgrade [数量] — 选择卡牌强化，默认1次
 upgrade test — 切换百科卡牌总览的全部卡牌强化，再次输入或退出总览后恢复
 add medal 数量 — 添加勋章（正整数）
-add curse 名称|说明 — 获得持续存在的周目诅咒，说明可省略
+add curse 诅咒名称 — 获得 data/curses.txt 中的诅咒卡，已持有时不重复获得
+maxhp 百分比 — 最大HP增加1～100%（部队HP增加率）
 """
 
 func _ready() -> void:
@@ -76,7 +81,7 @@ func execute(command: String) -> void:
 ## Shared command dispatcher: event options do not manipulate the console UI.
 func run_command(command: String, context: Node = null) -> Dictionary:
 	command = command.strip_edges()
-	if command.is_empty(): return {"ok": true, "message": "你继续踏上了旅途。"}
+	if command.is_empty(): return {"ok": true, "message": ""}
 	var split := command.split(" ", false, 1)
 	var verb := split[0].to_lower()
 	var argument := split[1].strip_edges() if split.size() == 2 else ""
@@ -89,10 +94,10 @@ func run_command(command: String, context: Node = null) -> Dictionary:
 			message = HELP_TEXT
 			ok = true
 		"travel":
-			if not argument.is_empty(): message = "用法：travel（再次输入关闭自由行军）"
+			if not argument.is_empty(): message = "用法：travel（再次输入关闭自由移动）"
 			else:
 				var enabled: bool = get_node("/root/RunSession").toggle_travel()
-				message = "自由行军已开启：可进入当前楼层任意节点。" if enabled else "自由行军已关闭：恢复正常路线限制。"
+				message = "自由移动已开启：可进入当前楼层任意节点。" if enabled else "自由移动已关闭：恢复正常路线限制。"
 				ok = true
 		"shop":
 			message = get_node("/root/ShopManager").launch()
@@ -123,7 +128,42 @@ func run_command(command: String, context: Node = null) -> Dictionary:
 				session.heal(int(argument))
 				message = "恢复%d%%最大生命。" % int(argument)
 				ok = true
-			else: message = "用法：heal 1～100（恢复最大HP百分比，需在行军中）"
+			else: message = "用法：heal 1～100（恢复最大HP百分比，需在冒险中）"
+		"hurt":
+			var session: Node = context if context != null else get_node("/root/EventManager").current_session()
+			if session.active and argument.is_valid_int() and int(argument) > 0 and int(argument) < 100:
+				message = "失去%d点生命。" % session.hurt(int(argument))
+				ok = true
+			else: message = "用法：hurt 1～99（失去最大HP百分比，需在冒险中）"
+		"maxhp":
+			var source: TroopState = context.troop if context != null else get_node("/root/BattleManager").current_troop()
+			if source == null: message = "部队数据加载失败。"
+			elif argument.is_valid_int() and int(argument) > 0 and int(argument) <= 100:
+				source.add_max_hp_bonus(int(argument))
+				message = "最大生命增加%d%%。" % int(argument)
+				ok = true
+			else: message = "用法：maxhp 1～100（最大HP增加百分比）"
+		"choose":
+			var args := argument.split(" ", false, 1)
+			if args.size() == 2 and args[0].to_lower() == "relic":
+				message = get_node("/root/BattleManager").launch_relic_choice(EventCommands.relic_list(args[1]), context != null)
+				ok = message.begins_with("选择遗物") or message == "没有可获得的遗物。"
+			else: message = "用法：choose relic 名称|名称|…"
+		"random":
+			var args := argument.split(" ", false, 2)
+			if args.size() == 3 and args[0].to_lower() == "relic" and args[1].is_valid_int() and int(args[1]) > 0:
+				message = get_node("/root/BattleManager").grant_random_relics(int(args[1]), EventCommands.relic_list(args[2]))
+				ok = message.begins_with("获得遗物") or message == "没有可获得的遗物。"
+			else: message = "用法：random relic 数量 名称|名称|…"
+		"pay":
+			var source: TroopState = get_node("/root/BattleManager").current_troop()
+			var amount := int(argument) if argument.is_valid_int() else 0
+			if source == null: message = "数据加载失败。"
+			elif amount <= 0: message = "用法：pay 正整数数量"
+			elif not source.spend_gold(amount): message = "贝壳不足：需要%d，持有%d。" % [amount, source.gold]
+			else:
+				message = "支付贝壳：%d" % amount
+				ok = true
 		"gold":
 			var source: TroopState = get_node("/root/BattleManager").current_troop()
 			var amount := int(argument) if argument.is_valid_int() else 0
@@ -146,16 +186,17 @@ func run_command(command: String, context: Node = null) -> Dictionary:
 					ok = true
 			elif args.size() == 2 and args[0].to_lower() == "curse":
 				var source: TroopState = context.troop if context != null else get_node("/root/BattleManager").current_troop()
-				var curse := TroopState.parse_curse(args[1])
+				var name := args[1].strip_edges()
 				if source == null: message = "部队数据加载失败。"
-				elif curse.is_empty(): message = "用法：add curse 名称|说明"
+				elif not CurseCatalog.shared().by_name.has(name): message = "未找到诅咒：" + name
 				else:
-					ok = source.acquire_curse(curse.name, curse.description)
-					message = ("获得诅咒：" if ok else "已持有诅咒：") + curse.name
+					# Already holding it is not a failure: events continue with their other rewards.
+					ok = true
+					message = ("获得诅咒：" if source.acquire_curse(name) else "已持有诅咒：") + name
 			elif args.size() == 2 and args[0].to_lower() in ["relic", "card"]:
 				message = get_node("/root/BattleManager").grant(args[0].to_lower(), args[1].strip_edges())
 				ok = message.begins_with("获得")
-			else: message = "用法：add relic 遗物名称 / add card 卡牌名称 / add medal 正整数数量 / add curse 名称|说明"
+			else: message = "用法：add relic 遗物名称 / add card 卡牌名称 / add medal 正整数数量 / add curse 诅咒名称"
 		"delet", "delete":
 			var args := argument.split(" ", false, 1)
 			var source: TroopState = get_node("/root/BattleManager").current_troop()

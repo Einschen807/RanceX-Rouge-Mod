@@ -48,6 +48,12 @@ static func resolve(event: Dictionary, troop: TroopState, rng: RandomNumberGener
 			option.text = option.text.replace(token, name if not name.is_empty() else "（无可用遗物）")
 			option.command = option.command.replace(token, name)
 		option["variables"] = bindings
+		# Options that cost shells are disabled when the party cannot pay.
+		var cost := 0
+		for command: String in option.command.split("/", false):
+			var parts := command.strip_edges().split(" ", false)
+			if parts.size() == 2 and parts[0].to_lower() == "pay" and parts[1].is_valid_int(): cost += int(parts[1])
+		if error.is_empty() and cost > troop.gold: error = "贝壳不足（需要%d）。" % cost
 		option["unavailable"] = error
 		if not error.is_empty(): option.text += "\n" + error
 	return result

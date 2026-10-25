@@ -48,6 +48,7 @@ var outcome := ""
 var logs: Array[String] = []
 ## Successful friendly type-7 activations; never shared with the persistent troop.
 var abilities: Array[Dictionary] = []
+var battle_curses: Array[Dictionary] = []
 var ability_rules := BattleAbilities.fresh_rules()
 var center_boost_enabled := false
 ## 赛斯的旗帜 has already extended a status this battle.
@@ -218,8 +219,15 @@ func start() -> bool:
 		_prepare_accuracy("enemy", result.commands, troop.catalog.skills[id], int(monster.get("element", 0)))
 		apply_skill_commands("enemy", id, result.commands)
 		if phase == "result": break
+	# Snapshot before one-shot curses leave the troop, so the state panel still lists them.
+	battle_curses = CurseEffects.battle_records(troop)
+	if phase == "player": CurseEffects.battle_start(self)
 	if phase == "player": _turn_start()
 	return true
+
+## Combat-relevant curses: live during preparation, the start-of-battle snapshot afterwards.
+func curse_records() -> Array[Dictionary]:
+	return CurseEffects.battle_records(troop) if phase == "preparation" else battle_curses
 
 func context(side: String, card: Dictionary = {}) -> Dictionary:
 	var at := float(monster.base_at)
@@ -588,6 +596,9 @@ func _apply(side: String, skill: Dictionary, commands: Array) -> void:
 				if int(command.index) not in enemy_blocks: enemy_blocks.append(int(command.index))
 			"restore_ap":
 				ap = mini(ap_max(), ap + int(command.amount))
+			"ap_destroy":
+				# Only the player side holds AP; monsters have none to destroy.
+				if player_target: ap = maxi(0, ap - int(command.amount))
 			"spend_shells":
 				troop.spend_gold(mini(troop.gold, int(command.amount)))
 			"kill_bonus":
@@ -691,7 +702,7 @@ func lose_hp(side: String, percent: float, command: Dictionary = {}) -> float:
 	elif command.get("basis", "") == "missing": basis = maxf(0.0, maximum - hp)
 	var amount := minf(hp, maxf(0.0, basis * percent / 100.0))
 	if BattleSupports.absorb(self, side, command, amount): return 0.0
-	amount = BattleShields.absorb(self, side, amount)
+	# Direct HP loss (自爆, percent loss, 即死) bypasses shields entirely.
 	if side == "player":
 		player_hp -= amount
 		player_damage_total += amount

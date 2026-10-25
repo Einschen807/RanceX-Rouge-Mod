@@ -62,9 +62,9 @@ func refresh_entries() -> void:
 	for child: Node in _rows.get_children():
 		_rows.remove_child(child)
 		child.queue_free()
-	var records: Array = battle.abilities if current_page == "ability" else battle.troop.curses
+	var records: Array = battle.abilities if current_page == "ability" else battle.curse_records()
 	if records.is_empty():
-		var empty := _text(_rows, "本场战斗尚未发动能力。" if current_page == "ability" else "当前未持有诅咒。", Vector2.ZERO, Vector2(320, 120), 19, Color("c9bda2"))
+		var empty := _text(_rows, "本场战斗尚未发动能力。" if current_page == "ability" else "没有影响战斗的诅咒。", Vector2.ZERO, Vector2(320, 120), 19, Color("c9bda2"))
 		empty.name = "EmptyState"
 		empty.custom_minimum_size = Vector2(0, 120)
 		empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

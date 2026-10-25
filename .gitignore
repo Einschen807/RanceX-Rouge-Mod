@@ -18,3 +18,4 @@ Thumbs.db
 
 # Built game; rebuild with 一键编译并运行.bat instead of tracking it
 /Rance.exe
+/Rance.pck

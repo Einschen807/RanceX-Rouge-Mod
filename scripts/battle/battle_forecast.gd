@@ -20,6 +20,7 @@ static func snapshot(source: BattleState) -> BattleState:
 	formation.relics.assign(source.troop.relics)
 	formation.relic_counters = source.troop.relic_counters.duplicate(true)
 	formation.curses.assign(source.troop.curses.duplicate(true))
+	formation.max_hp_bonus = source.troop.max_hp_bonus
 	formation.gold = source.troop.gold
 	formation.available.assign(source.troop.available)
 	formation.leaders.assign(source.troop.leaders)
@@ -38,6 +39,7 @@ static func snapshot(source: BattleState) -> BattleState:
 	copy.enemy_runtime = _runtime(source.enemy_runtime)
 	copy.intent = source.intent.duplicate(true)
 	copy.abilities.assign(source.abilities.duplicate(true))
+	copy.battle_curses.assign(source.battle_curses.duplicate(true))
 	copy.ability_rules = source.ability_rules.duplicate(true)
 	copy.center_boost_enabled = source.center_boost_enabled
 	copy.delayed_recoveries.assign(source.delayed_recoveries.duplicate(true))

@@ -10,7 +10,10 @@ var _run_node_battle := false
 var _treasure_layer: CanvasLayer
 var _treasure: TreasureRewardScreen
 var _debug_troop: TroopState
-var _relic_chest: RelicChestScreen
+## Relic chest or relic choice screen; both emit completed when closed.
+var _relic_chest: Control
+## Outcome of the most recently closed battle (胜利/败北/时间结束), read by event sequences.
+var last_outcome := ""
 var _upgrade: CardUpgradeScreen
 var _upgrade_layer: CanvasLayer
 var _upgrade_battle_mode := Node.PROCESS_MODE_INHERIT
@@ -151,12 +154,60 @@ func launch_relic(pool := "默认遗物池") -> String:
 	_treasure_layer = CanvasLayer.new()
 	_treasure_layer.layer = 70
 	add_child(_treasure_layer)
-	_relic_chest = RelicChestScreen.new()
-	_relic_chest.troop = source
-	_relic_chest.record = record
-	_relic_chest.completed.connect(_close_relic_chest)
-	_treasure_layer.add_child(_relic_chest)
+	var chest := RelicChestScreen.new()
+	chest.troop = source
+	chest.record = record
+	chest.completed.connect(_close_relic_chest)
+	_relic_chest = chest
+	_treasure_layer.add_child(chest)
 	return "打开遗物宝箱：" + pool
+
+## Event and console choice of one relic from a list; owned names are skipped.
+func launch_relic_choice(names: PackedStringArray, mandatory := false) -> String:
+	if is_instance_valid(get_node("/root/ShopManager").active): return "请先离开商店。"
+	if is_instance_valid(_relic_chest) or is_instance_valid(_treasure) or get_node("/root/ScreenTransition").busy or is_instance_valid(active): return "当前界面不能打开遗物选择。"
+	var source := current_troop()
+	if source == null: return "数据加载失败。"
+	var relics := RelicCatalog.new()
+	if not relics.load_catalog(): return "遗物数据加载失败：" + "
+".join(relics.errors)
+	var records: Array[Dictionary] = []
+	for name: String in names:
+		if not relics.by_name.has(name): return "未找到遗物：" + name
+		if name not in source.relics: records.append(relics.by_name[name])
+	if records.is_empty(): return "没有可获得的遗物。"
+	get_node("/root/RelicHUD").bind_troop(source)
+	_treasure_layer = CanvasLayer.new()
+	_treasure_layer.layer = 70
+	add_child(_treasure_layer)
+	var screen := RelicChoiceScreen.new()
+	screen.troop = source
+	screen.records = records
+	screen.mandatory = mandatory
+	screen.completed.connect(_close_relic_chest)
+	_relic_chest = screen
+	_treasure_layer.add_child(screen)
+	return "选择遗物：" + "、".join(records.map(func(record: Dictionary) -> String: return record.name))
+
+## Grants up to count random unowned relics from the list.
+func grant_random_relics(count: int, names: PackedStringArray) -> String:
+	var source := current_troop()
+	if source == null: return "数据加载失败。"
+	var relics := RelicCatalog.new()
+	if not relics.load_catalog(): return "遗物数据加载失败：" + "
+".join(relics.errors)
+	var candidates: Array[String] = []
+	for name: String in names:
+		if not relics.by_name.has(name): return "未找到遗物：" + name
+		if name not in source.relics and name not in candidates: candidates.append(name)
+	if candidates.is_empty(): return "没有可获得的遗物。"
+	get_node("/root/RelicHUD").bind_troop(source)
+	var rng: RandomNumberGenerator = get_node("/root/RunAutosave").rng
+	var gained: Array[String] = []
+	while gained.size() < count and not candidates.is_empty():
+		var name: String = candidates.pop_at(rng.randi_range(0, candidates.size() - 1))
+		if source.acquire_relic(name, Vector2(960 + (gained.size() - 1.5) * 120, 540)): gained.append(name)
+	return "获得遗物：" + "、".join(gained)
 
 func _close_relic_chest() -> void:
 	_relic_chest = null
@@ -222,6 +273,7 @@ func launch(identity: String) -> String:
 	return "进入战斗：" + str(monsters.monsters[identity].name)
 
 func _enter_battle(source: TroopState, monsters: MonsterCatalog, identity: String, formation: TroopFormation) -> void:
+	last_outcome = ""
 	if is_instance_valid(active):
 		active.battle.finish()
 		active.queue_free()
@@ -253,6 +305,7 @@ func close() -> void:
 	_run_node_battle = false
 	if is_instance_valid(active):
 		result = active.battle.outcome
+		last_outcome = result
 		hp = active.battle.player_hp
 		maximum = active.battle.player_max_hp
 		active.battle.finish()

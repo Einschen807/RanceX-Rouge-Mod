@@ -380,6 +380,12 @@ func set_event_damage(value: float) -> void:
 	missing_hp = maxf(0, value)
 	changed.emit()
 
+## Event cost: loses a share of maximum HP but always leaves at least 1 HP.
+func hurt(percent: int) -> int:
+	var lost := mini(roundi(troop.total("hp") * float(percent) / 100.0), maxi(0, ceili(hp()) - 1))
+	set_event_damage(missing_hp + lost)
+	return lost
+
 func train(name: String, stars := 1) -> void:
 	troop.set_level(name, troop.level(name) + stars)
 

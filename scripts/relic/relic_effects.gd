@@ -5,9 +5,9 @@ class_name RelicEffects
 const PERIODS := {"加奈美忍法帖": 6, "3段喷射发动机": 3, "飞马": 10, "瓦古奖章": 10, "拉包尔之弓": 3}
 const AP_SPENT := ["飞马"]
 ## Skill 0 means the native AP+1 recovery handled in execute().
-const SKILLS := {"加奈美忍法帖": 9800, "妖怪宝具": 9801, "郁金香2号": 9802, "郁金香兵": 9803, "郁金香3号": 9804, "平实柠檬": 9805, "赫尔曼石墙": 9806, "守护神": 9807, "塔罗柯发动机": 0, "利萨斯的旗帜": 9808, "赫尔曼的旗帜": 9809, "男人的友情": 9810, "医学全集": 9811, "雷伊奖章": 9812, "希尔琪奖章": 9813, "瓦古奖章": 9814, "拉包尔之弓": 9815, "毒团子": 9816}
+const SKILLS := {"加奈美忍法帖": 9800, "妖怪宝具": 9801, "郁金香2号": 9802, "郁金香兵": 9803, "郁金香3号": 9804, "平实柠檬": 9805, "赫尔曼石墙": 9806, "守护神": 9807, "塔罗柯发动机": 0, "利萨斯的旗帜": 9808, "赫尔曼的旗帜": 9809, "男人的友情": 9810, "医学全集": 9811, "雷伊奖章": 9812, "希尔琪奖章": 9813, "瓦古奖章": 9814, "拉包尔之弓": 9815, "毒团子": 9816, "低语的黑铠": 9817}
 ## Fired once at the start of round 1.
-const BATTLE_START := ["郁金香2号", "平实柠檬", "赫尔曼石墙", "塔罗柯发动机", "守护神", "医学全集", "毒团子"]
+const BATTLE_START := ["郁金香2号", "平实柠檬", "赫尔曼石墙", "塔罗柯发动机", "守护神", "医学全集", "毒团子", "低语的黑铠"]
 ## Once-per-run relics: counter 1 marks them spent (saved with the troop, dimmed on the HUD).
 const ONE_SHOT := ["哈尼打火机"]
 ## Fired when the player ends the given round, before the enemy turn begins.

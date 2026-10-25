@@ -265,7 +265,12 @@ func _refresh_faction_cards() -> void:
 		var widget := _card(card, false)
 		_grid.add_child(widget)
 		if card.name == _return_name: widget.modulate.a = 0.0
-	if cards.is_empty():
+	# Curse cards follow the 主人公 cards; they cannot be deployed, dragged or upgraded.
+	var curses: Array[Dictionary] = []
+	if selected_faction == CurseCatalog.FACTION and not upgrade_selection: curses = troop.curses
+	for curse: Dictionary in curses:
+		_grid.add_child(CurseCard.make(curse))
+	if cards.is_empty() and curses.is_empty():
 		FormationArt.label(_grid, "此阵营暂无卡牌", Vector2.ZERO, Vector2(650, 100), 28, FormationArt.GOLD)
 	var path := "res://assets/formation/native/ground_%d/animation.json" % selected_faction
 	if _ground.animation_path != path:
@@ -579,7 +584,7 @@ func _stagger_cards(alpha: float, include_leaders: bool = false) -> void:
 	var viewport_rect := _scroll.get_global_rect()
 	for i: int in range(_grid.get_child_count()):
 		var child := _grid.get_child(i) as Control
-		if child is CardWidget and viewport_rect.intersects(child.get_global_rect()):
+		if (child is CardWidget or child is RelicCard) and viewport_rect.intersects(child.get_global_rect()):
 			var rank: int = i / _grid.columns + i % _grid.columns
 			visible_cards.append(child)
 			ranks.append(rank)
