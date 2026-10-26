@@ -69,8 +69,8 @@ static func valid(data: Dictionary, catalog: CardCatalog) -> bool:
 	if data.has("relic_counters"):
 		if not data.relic_counters is Dictionary: return false
 		for name: Variant in data.relic_counters:
-			if not name is String or name not in data.get("relics", []) or not (RelicEffects.PERIODS.has(name) or name in RelicEffects.ONE_SHOT): return false
-			if not _integer(data.relic_counters[name], 0) or data.relic_counters[name] >= int(RelicEffects.PERIODS.get(name, 2)): return false
+			if not name is String or name not in data.get("relics", []) or not (RelicEffects.PERIODS.has(name) or name in RelicEffects.ONE_SHOT or name in RelicEffects.STACKING): return false
+			if not _integer(data.relic_counters[name], 0) or (name not in RelicEffects.STACKING and data.relic_counters[name] >= int(RelicEffects.PERIODS.get(name, 2))): return false
 	var owned: Dictionary = {}
 	for name: Variant in data.cards:
 		if not name is String or catalog.find_name(name).is_empty() or owned.has(name): return false
@@ -105,7 +105,7 @@ static func restore(troop: TroopState, data: Dictionary) -> bool:
 	troop.relics.assign(data.get("relics", []))
 	troop.relic_counters.clear()
 	for name: String in troop.relics:
-		if RelicEffects.PERIODS.has(name) or name in RelicEffects.ONE_SHOT: troop.relic_counters[name] = int(data.get("relic_counters", {}).get(name, 0))
+		if RelicEffects.PERIODS.has(name) or name in RelicEffects.ONE_SHOT or name in RelicEffects.STACKING: troop.relic_counters[name] = int(data.get("relic_counters", {}).get(name, 0))
 	troop.available.clear()
 	for name: String in data.cards: troop.available.append(troop.catalog.find_name(name))
 	troop.leaders.assign(data.leaders)

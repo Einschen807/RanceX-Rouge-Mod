@@ -344,6 +344,7 @@ func battle_won(player_hp: float, max_hp: float) -> void:
 	missing_hp = RelicEffects.victory_missing_hp(troop, player_hp, max_hp)
 	beaten[pending.monster] = true
 	if pending.type == "monster": normal_battles[act] += 1
+	if pending.type == "elite": RelicEffects.elite_defeated(troop)
 	changed.emit()
 
 func heal(percent: int) -> void:

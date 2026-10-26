@@ -52,7 +52,7 @@ func _process(_delta: float) -> void:
 		if _battle != null: _battle.relic_triggered.connect(_trigger)
 	for name: String in icons:
 		var icon: RelicIcon = icons[name]
-		icon.counter = int(troop.relic_counters.get(name, 0)) if troop != null and RelicEffects.PERIODS.has(name) else -1
+		icon.counter = int(troop.relic_counters.get(name, 0)) if troop != null and (RelicEffects.PERIODS.has(name) or name in RelicEffects.STACKING) else -1
 		icon.imminent = RelicEffects.PERIODS.has(name) and icon.counter == int(RelicEffects.PERIODS[name]) - 1
 		icon.spent = troop != null and RelicEffects.spent(troop, name)
 		icon.queue_redraw()

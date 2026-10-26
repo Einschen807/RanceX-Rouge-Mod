@@ -191,7 +191,7 @@ func acquire_relic(display_name: String, source_position := Vector2(960, 540)) -
 	var database := RelicCatalog.new()
 	if not database.load_catalog() or not database.by_name.has(display_name): return false
 	relics.append(display_name)
-	if RelicEffects.PERIODS.has(display_name): relic_counters[display_name] = 0
+	if RelicEffects.PERIODS.has(display_name) or display_name in RelicEffects.STACKING: relic_counters[display_name] = 0
 	RelicEffects.acquired(self, display_name)
 	changed.emit()
 	relic_acquired.emit(display_name, source_position)

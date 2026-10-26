@@ -10,6 +10,8 @@ const SKILLS := {"加奈美忍法帖": 9800, "妖怪宝具": 9801, "郁金香2�
 const BATTLE_START := ["郁金香2号", "平实柠檬", "赫尔曼石墙", "塔罗柯发动机", "守护神", "医学全集", "毒团子", "低语的黑铠"]
 ## Once-per-run relics: counter 1 marks them spent (saved with the troop, dimmed on the HUD).
 const ONE_SHOT := ["哈尼打火机"]
+## Stacking relics: the counter only grows (saved with the troop, shown on the HUD).
+const STACKING := ["锈蚀的古剑"]
 ## Fired when the player ends the given round, before the enemy turn begins.
 const TURN_END_ROUNDS := {"郁金香3号": 7}
 ## 希尔琪奖章: fired at every player turn end while the shield reaches this percent of max HP.
@@ -116,9 +118,19 @@ const FRIDGE_PERCENT := 10.0
 ## 自由的旗帜: flat bonus on every troop rate, including critical/combo chances.
 const FREEDOM_RATE := 3.0
 const FREEDOM_KINDS := ["hp", "physical", "magic", "physical_resist", "magic_resist", "critical", "combo"]
+## 锈蚀的古剑: the same troop rates, per elite defeated since it was acquired.
+const RUSTY_SWORD_RATE := 2.0
 
 static func troop_rate_bonus(troop: TroopState, kind: String) -> float:
-	return FREEDOM_RATE if kind in FREEDOM_KINDS and "自由的旗帜" in troop.relics else 0.0
+	if kind not in FREEDOM_KINDS: return 0.0
+	var bonus := FREEDOM_RATE if "自由的旗帜" in troop.relics else 0.0
+	return bonus + RUSTY_SWORD_RATE * int(troop.relic_counters.get("锈蚀的古剑", 0))
+
+## 锈蚀的古剑: every elite node won adds one stack.
+static func elite_defeated(troop: TroopState) -> void:
+	if "锈蚀的古剑" not in troop.relics: return
+	troop.relic_counters["锈蚀的古剑"] = int(troop.relic_counters.get("锈蚀的古剑", 0)) + 1
+	troop.changed.emit()
 
 static func fridge_carry(state: BattleState, side: String) -> float:
 	return BattleShields.maximum(state, side) * FRIDGE_PERCENT / 100.0 if side == "player" and "冰箱" in state.troop.relics else 0.0
