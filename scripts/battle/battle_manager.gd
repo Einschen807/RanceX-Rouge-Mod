@@ -12,7 +12,7 @@ var _treasure: TreasureRewardScreen
 var _debug_troop: TroopState
 ## Relic chest or relic choice screen; both emit completed when closed.
 var _relic_chest: Control
-## Outcome of the most recently closed battle (胜利/败北/时间结束), read by event sequences.
+## Outcome of the most recently closed battle (胜利/败北), read by event sequences.
 var last_outcome := ""
 var _upgrade: CardUpgradeScreen
 var _upgrade_layer: CanvasLayer

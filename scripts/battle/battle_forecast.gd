@@ -72,7 +72,7 @@ static func snapshot(source: BattleState) -> BattleState:
 	copy.pending_down_replacements.assign(source.pending_down_replacements.duplicate(true))
 	copy.blocked_player_actors.assign(source.blocked_player_actors)
 	copy.animate_automatic_skills = true
-	for field: String in ["phase", "round", "round_limit", "ap", "combo", "combo_limit", "player_hp", "player_max_hp", "enemy_hp", "enemy_max_hp", "player_at_bonus", "enemy_at_bonus", "next_swap_round", "player_has_acted", "outcome", "enemy_actions_done", "blocked_enemy_action", "player_damage_total", "enemy_damage_total"]:
+	for field: String in ["phase", "round", "ap", "combo", "combo_limit", "player_hp", "player_max_hp", "enemy_hp", "enemy_max_hp", "player_at_bonus", "enemy_at_bonus", "next_swap_round", "player_has_acted", "outcome", "enemy_actions_done", "blocked_enemy_action", "player_damage_total", "enemy_damage_total"]:
 		copy.set(field, source.get(field))
 	return copy
 

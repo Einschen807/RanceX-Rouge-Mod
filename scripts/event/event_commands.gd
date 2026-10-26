@@ -60,7 +60,7 @@ static func validate(commands: PackedStringArray, troop: TroopState, session: No
 				if not relics.pools.has(pool): return "未找到遗物池：" + pool
 				if relics.pools[pool].all(func(record: Dictionary) -> bool: return record.name in owned): return "遗物池没有可获得的遗物。"
 			"hurt":
-				if not session.active or not argument.is_valid_int() or int(argument) <= 0 or int(argument) >= 100: return "用法：hurt 1～99（失去最大HP百分比，需在冒险中）"
+				if not session.active or not argument.is_valid_int() or int(argument) <= 0 or int(argument) >= 100: return "用法：hurt 1～99（失去最大HP百分比，需在冒险中；生命归零即失败）"
 			"choose", "random":
 				var args := argument.split(" ", false, 1 if verb == "choose" else 2)
 				if args.size() != (2 if verb == "choose" else 3) or args[0].to_lower() != "relic" or (verb == "random" and (not args[1].is_valid_int() or int(args[1]) <= 0)):
@@ -96,7 +96,7 @@ static func execute(source: String, session: Node) -> Dictionary:
 	var messages := PackedStringArray()
 	var completed := 0
 	for command: String in commands:
-		if not is_instance_valid(session) or not session.active or session.pending != pending: return {"ok": false, "message": "事件已关闭。", "completed": completed}
+		if not is_instance_valid(session) or not session.active or session.defeated or session.pending != pending: return {"ok": false, "message": "事件已关闭。", "completed": completed}
 		var result: Dictionary = session.get_node("/root/DebugConsole").run_command(command.strip_edges(), session)
 		if not result.ok:
 			messages.append(result.message)
@@ -107,7 +107,7 @@ static func execute(source: String, session: Node) -> Dictionary:
 		# Commands that open a screen finish that screen before the next command.
 		while transition.busy or is_instance_valid(battle.active) or is_instance_valid(battle._upgrade) or is_instance_valid(battle._treasure) or is_instance_valid(battle._relic_chest) or is_instance_valid(shop.active) or (is_instance_valid(events.active) and events.active.session != session):
 			await tree.process_frame
-			if not is_instance_valid(session) or not session.active or session.pending != pending: return {"ok": false, "message": "事件已关闭。", "completed": completed}
+			if not is_instance_valid(session) or not session.active or session.defeated or session.pending != pending: return {"ok": false, "message": "事件已关闭。", "completed": completed}
 		# Rewards after a battle are a prize for winning it; a loss or timeout ends the sequence.
 		if launched_battle and battle.last_outcome != "胜利":
 			messages.append("战斗未获胜，后续奖励取消。")

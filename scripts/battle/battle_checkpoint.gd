@@ -2,7 +2,7 @@ extends RefCounted
 class_name BattleCheckpoint
 ## Preparation snapshots drive the local Restart button, independently of node saves.
 const VERSION := 1
-const FIELDS := ["phase", "round", "round_limit", "ap", "combo", "combo_limit", "player_hp", "player_max_hp", "enemy_hp", "enemy_max_hp", "player_at_bonus", "enemy_at_bonus", "next_swap_round", "player_has_acted", "intent", "outcome", "logs", "enemy_actions_done", "player_statuses", "enemy_statuses", "blocked_player_actors", "blocked_enemy_action", "player_damage_total", "enemy_damage_total", "extra_damage_rates", "received_damage_rates", "combat_damage_rates", "extra_resistance_rates", "support_groups", "support_turns", "next_support_uid", "enemy_down"]
+const FIELDS := ["phase", "round", "ap", "combo", "combo_limit", "player_hp", "player_max_hp", "enemy_hp", "enemy_max_hp", "player_at_bonus", "enemy_at_bonus", "next_swap_round", "player_has_acted", "intent", "outcome", "logs", "enemy_actions_done", "player_statuses", "enemy_statuses", "blocked_player_actors", "blocked_enemy_action", "player_damage_total", "enemy_damage_total", "extra_damage_rates", "received_damage_rates", "combat_damage_rates", "extra_resistance_rates", "support_groups", "support_turns", "next_support_uid", "enemy_down"]
 
 static func capture(state: BattleState) -> Dictionary:
 	assert(state.phase == "preparation")

@@ -28,7 +28,6 @@ var runtime: SkillRuntime
 var enemy_runtime := SkillRuntime.new()
 var phase := "preparation"
 var round := 1
-var round_limit := 99
 var ap := 0
 var combo := 0
 var combo_limit := 13
@@ -387,11 +386,6 @@ func finish_enemy_turn() -> void:
 	_decay_statuses("enemy")
 	_check_result()
 	if phase == "result":
-		changed.emit()
-		return
-	if round >= round_limit:
-		outcome = "时间结束"
-		phase = "result"
 		changed.emit()
 		return
 	if BattleDoushinTargets.has(self, "enemy", BattleDoushinTargets.LOCK):

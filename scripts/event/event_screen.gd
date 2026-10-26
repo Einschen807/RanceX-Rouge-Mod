@@ -214,7 +214,7 @@ func _choose(index: int) -> void:
 	_busy = true
 	_preview.hide_all()
 	var result: Dictionary = await session.choose_event_option(index)
-	if not is_inside_tree(): return
+	if not is_inside_tree() or session.defeated: return
 	_busy = false
 	if result.ok or session.pending.get("event_resolved", false): show_result(result.message)
 	else:

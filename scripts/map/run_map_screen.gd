@@ -40,6 +40,7 @@ func _ready() -> void:
 	_build()
 	session.troop_leveled_up.connect(_queue_rank_up)
 	session.travel_mode_changed.connect(_refresh_node_availability)
+	session.run_defeated.connect(_game_over)
 	get_node("/root/BattleManager").run_battle_closed.connect(_battle_closed)
 	get_node("/root/ShopManager").node_shop_closed.connect(_finish_node)
 	_rebuild_map()
@@ -201,7 +202,7 @@ func _show_pending() -> void:
 	if is_instance_valid(get_node("/root/EventManager").active): return
 	if session.pending.is_empty(): return
 	if session.ended:
-		_end_screen(true)
+		_end_screen()
 		return
 	match session.pending.type:
 		"monster", "elite", "boss":
@@ -249,10 +250,8 @@ func _launch_battle() -> void:
 	if not error.is_empty(): _message("无法进入战斗", error)
 
 func _battle_closed(outcome: String, hp: float, maximum: float) -> void:
-	if not is_inside_tree() or session.pending.is_empty(): return
-	if outcome != "胜利":
-		_end_screen(false)
-		return
+	# A battle only ends in defeat when the troop died, and the run is already over then.
+	if not is_inside_tree() or session.pending.is_empty() or session.defeated or outcome != "胜利": return
 	session.battle_won(hp, maximum)
 	session.pending["cleared"] = true
 	_rebuild_map()
@@ -455,17 +454,24 @@ func _close_formation() -> void:
 		_formation = null
 		_refresh_hud())
 
-func _end_screen(won: bool) -> void:
-	_dialog("通关" if won else "部队败北", "四层首领均已击破。" if won else "可以从当前节点入口重新出发。", "end", Vector2(680, 460))
-	if not won:
-		_action("重试本节点", Vector2(240, 220), func() -> void:
-			if not session.resume():
-				_message("无法继续", session.error)
-				return
-			_clear_modal()
-			_rebuild_map()
-			_show_pending())
+func _end_screen() -> void:
+	_dialog("通关", "四层首领均已击破。", "end", Vector2(680, 460))
 	_action("返回标题", Vector2(240, 325), func() -> void: close_requested.emit())
+
+## Death: under a black frame the run is suspended (battle, event and shop close) and the
+## game-over screen covers the map; any key then returns to the title, which removes both.
+func _game_over() -> void:
+	var stats := GameOverScreen.stats_of(session)
+	var transition := get_node("/root/ScreenTransition")
+	while transition.busy: await get_tree().process_frame
+	if not is_inside_tree(): return
+	await transition.play(func() -> void:
+		session.suspend()
+		_clear_modal()
+		var screen := GameOverScreen.new()
+		screen.stats = stats
+		screen.finished.connect(func() -> void: session.title_requested.emit())
+		add_child(screen))
 
 func _blocked(allow_banner_pan := false) -> bool:
 	return _starting_floor or (is_instance_valid(_theme_banner) and not allow_banner_pan) or _traveling or is_instance_valid(_modal) or is_instance_valid(_formation) or _launching or get_node("/root/ScreenTransition").busy or is_instance_valid(get_node("/root/BattleManager").active) or get_tree().get_first_node_in_group("modal_overlay") != null

@@ -134,7 +134,7 @@ func run_command(command: String, context: Node = null) -> Dictionary:
 			if session.active and argument.is_valid_int() and int(argument) > 0 and int(argument) < 100:
 				message = "失去%d点生命。" % session.hurt(int(argument))
 				ok = true
-			else: message = "用法：hurt 1～99（失去最大HP百分比，需在冒险中）"
+			else: message = "用法：hurt 1～99（失去最大HP百分比，需在冒险中；生命归零即失败）"
 		"maxhp":
 			var source: TroopState = context.troop if context != null else get_node("/root/BattleManager").current_troop()
 			if source == null: message = "部队数据加载失败。"

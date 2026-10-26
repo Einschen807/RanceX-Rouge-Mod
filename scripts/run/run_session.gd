@@ -4,6 +4,8 @@ signal changed
 signal troop_leveled_up(count: int)
 signal title_requested
 signal travel_mode_changed
+## HP reached 0 with no revive left: the run save is already gone; the map shows the game-over screen.
+signal run_defeated
 var catalog: CardCatalog
 var monsters: MonsterCatalog
 var pools: RunPoolCatalog
@@ -21,6 +23,7 @@ var missing_hp := 0.0
 var unknown_odds := {"monster": 0.10, "chest": 0.02, "shop": 0.03}
 var pending: Dictionary = {}
 var ended := false
+var defeated := false
 var active := false
 var error := ""
 ## Console-only switch for this application session; never included in checkpoints.
@@ -102,6 +105,7 @@ func begin(seed_override := -1) -> bool:
 	unknown_odds = {"monster": 0.10, "chest": 0.02, "shop": 0.03}
 	pending.clear()
 	ended = false
+	defeated = false
 	active = true
 	for name: String in pools.initial_cards: troop.deploy(name)
 	get_node("/root/RunAutosave").begin_run("run_%d_%d" % [seed_value, Time.get_ticks_msec()], seed_value)
@@ -142,6 +146,7 @@ func resume() -> bool:
 	missing_hp = float(progress.missing_hp)
 	unknown_odds = progress.unknown_odds.duplicate()
 	ended = progress.ended
+	defeated = false
 	pending = entry.node.initial.duplicate(true)
 	if pending.get("type") == "shop" and not pending.has("inventory"):
 		pending["inventory"] = ShopInventory.generate(troop, autosave.rng)
@@ -222,7 +227,7 @@ func choose_event_option(index: int) -> Dictionary:
 	pending["event_executing"] = true
 	var entrance: Dictionary = pending
 	var result: Dictionary = await EventCommands.execute(event.options[index].command, self)
-	if not active or pending != entrance: return result
+	if not active or defeated or pending != entrance: return result
 	pending.erase("event_executing")
 	if not result.ok and result.get("completed", 0) == 0:
 		pending.erase("event_resolved")
@@ -381,11 +386,21 @@ func set_event_damage(value: float) -> void:
 	missing_hp = maxf(0, value)
 	changed.emit()
 
-## Event cost: loses a share of maximum HP but always leaves at least 1 HP.
+## Event cost: loses a share of maximum HP. Reaching 0 HP revives through 哈尼打火机 or ends the run.
 func hurt(percent: int) -> int:
-	var lost := mini(roundi(troop.total("hp") * float(percent) / 100.0), maxi(0, ceili(hp()) - 1))
+	var lost := mini(roundi(troop.total("hp") * float(percent) / 100.0), ceili(hp()))
 	set_event_damage(missing_hp + lost)
+	if hp() <= 0.0:
+		if RelicEffects.revive_outside_battle(troop): set_event_damage(troop.total("hp") * (1.0 - RelicEffects.REVIVE_PERCENT / 100.0))
+		else: defeat()
 	return lost
+
+## Death ends the run for good: the checkpoint is deleted at once, so quitting cannot bring it back.
+func defeat() -> void:
+	if defeated or not active: return
+	defeated = true
+	if get_node("/root/RunAutosave").discard_run() != OK: error = get_node("/root/RunAutosave").last_error
+	run_defeated.emit()
 
 func train(name: String, stars := 1) -> void:
 	troop.set_level(name, troop.level(name) + stars)

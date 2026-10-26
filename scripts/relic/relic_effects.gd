@@ -62,6 +62,13 @@ static func revive(state: BattleState) -> bool:
 	notify(state, "哈尼打火机")
 	return true
 
+## 哈尼打火机 outside battle (event HP loss): marks it spent; the caller restores REVIVE_PERCENT of max HP.
+static func revive_outside_battle(troop: TroopState) -> bool:
+	if "哈尼打火机" not in troop.relics or spent(troop, "哈尼打火机"): return false
+	troop.relic_counters["哈尼打火机"] = 1
+	troop.changed.emit()
+	return true
+
 ## 漫画肉: missing HP after a victory.
 static func victory_missing_hp(troop: TroopState, player_hp: float, max_hp: float) -> float:
 	var missing := maxf(0.0, max_hp - player_hp)

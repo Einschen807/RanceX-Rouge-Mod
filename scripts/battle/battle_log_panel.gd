@@ -39,7 +39,7 @@ func _scroll_to_latest() -> void:
 	scroll.scroll_vertical = int(scroll.get_v_scroll_bar().max_value)
 
 func _color(message: String) -> Color:
-	if message.begins_with("Round") or message in ["胜利", "败北", "时间结束"]:
+	if message.begins_with("Round") or message in ["胜利", "败北"]:
 		return FormationArt.GOLD
 	if message.contains("受到"):
 		return Color(1, 0.72, 0.75)

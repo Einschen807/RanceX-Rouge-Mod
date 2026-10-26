@@ -500,10 +500,19 @@ func _refresh() -> void:
 	if battle.phase == "result" and not input_locked and not is_instance_valid(_result):
 		if battle.outcome == "胜利":
 			_show_combat_end()
-		else:
+		elif not _run_defeat():
 			_result = _popup_frame(Vector2(655, 300), Vector2(610, 340))
 			BattleArt.label(_result, battle.outcome, Vector2(30, 30), Vector2(550, 100), 56, FormationArt.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
 			BattleArt.text_button(_result, "返回", Vector2(205, 235), Vector2(200, 65), func() -> void: close_requested.emit())
+
+## A run troop that falls has no Restart or Return: the run ends and the game-over screen takes over.
+func _run_defeat() -> bool:
+	var session := get_node("/root/RunSession")
+	if not session.active or battle.troop != session.troop: return false
+	input_locked = true
+	_restart_button.hide()
+	session.defeat()
+	return true
 
 func _show_combat_end() -> void:
 	input_locked = true
