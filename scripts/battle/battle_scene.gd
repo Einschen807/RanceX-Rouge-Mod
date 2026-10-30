@@ -8,12 +8,33 @@ const INTENT_RIGHT := 836.0
 const HP_TRAIL_HOLD := 0.40
 const HP_TRAIL_CATCH_UP := 0.18
 ## Monsters whose portrait plays the original enemy-formation flat; listed layers stay hidden.
-## Rock G keeps its own purple backdrop, as in the original battle.
 ## Monster portrait animations always run at fixed 1x, independent of the battle speed setting.
 const NATIVE_MONSTERS := {
 	"宝箱团子": {"folder": "monster_treasure", "hidden": ["Ｃ／背景", "样本背景.png", "Ｇ／色彩渐变.png"]},
-	"岩石G": {"folder": "monster_rock_g", "hidden": []},
 	"哈尼": {"folder": "monster_hanny", "hidden": []},
+	# 一层遗迹：原版敌方编组（m11/m22），静态立绘仅作目录校验与备用。
+	"单体哈尼": {"folder": "monster_hanny_m11", "hidden": []},
+	"古代种": {"folder": "monster_ancient", "hidden": []},
+	"普溜": {"folder": "monster_puyo", "hidden": []},
+	"乌贼帽": {"folder": "monster_zako", "hidden": []},
+	"眼球水母": {"folder": "monster_maze", "hidden": []},
+	"蝙蝠": {"folder": "monster_bat", "hidden": []},
+	"蝼洞虫": {"folder": "monster_rodou", "hidden": []},
+	"幽灵": {"folder": "monster_ghost", "hidden": []},
+	"石像": {"folder": "monster_statue", "hidden": []},
+	"沙虫": {"folder": "monster_sandworm", "hidden": []},
+	"魔法生物": {"folder": "monster_magic", "hidden": []},
+	"蜥蜴兽": {"folder": "monster_maze_mid", "hidden": []},
+	"大嘴眼球": {"folder": "monster_maze_frozen", "hidden": []},
+	"护目食尸鬼": {"folder": "monster_maze_high", "hidden": []},
+	"猪人枪兵": {"folder": "monster_maze_majisuko", "hidden": []},
+	"安东蚁": {"folder": "monster_ant", "hidden": []},
+	"拷问战士": {"folder": "monster_torture", "hidden": []},
+	"斗将": {"folder": "monster_tousho", "hidden": []},
+	"红鬼": {"folder": "monster_plain_high", "hidden": []},
+	"绿鬼": {"folder": "monster_oni", "hidden": []},
+	# 岩石巨像只保留前列本体，隐藏后列装甲兵。
+	"岩石巨像": {"folder": "monster_rock_golem", "hidden": ["Ｃ／后列", "Ｇ／怪物／后列.png"]},
 }
 signal close_requested
 var battle: BattleState
@@ -959,7 +980,7 @@ func _show_analysis() -> void:
 	_analysis_text(frame, "MonsterKind", ["普通怪", "精英怪", "BOSS"][monster.kind - 1], Vector2(26, 62), Vector2(340, 32), 23, FormationArt.GOLD, 4)
 	_analysis_text(frame, "Stats", "基础 AT\n物理抗性\n魔法抗性\n限伤", Vector2(26, 116), Vector2(140, 124), 21)
 	var cap := int(monster.get("damage_cap", 0))
-	var cap_text := "%d%%" % cap if cap > 0 else "不限伤"
+	var cap_text := "%d%%" % cap
 	_analysis_text(frame, "Values", "%d\n%d%%\n%d%%\n%s" % [monster.base_at, monster.physical_resist, monster.magic_resist, cap_text], Vector2(170, 116), Vector2(194, 124), 21)
 	var description := _analysis_text(frame, "Description", monster.analysis, Vector2(26, 246), Vector2(340, 114), 19)
 	description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

@@ -5,11 +5,11 @@ class_name RelicEffects
 const PERIODS := {"加奈美忍法帖": 6, "3段喷射发动机": 3, "飞马": 10, "瓦古奖章": 10, "拉包尔之弓": 3}
 const AP_SPENT := ["飞马"]
 ## Skill 0 means the native AP+1 recovery handled in execute().
-const SKILLS := {"加奈美忍法帖": 9800, "妖怪宝具": 9801, "郁金香2号": 9802, "郁金香兵": 9803, "郁金香3号": 9804, "平实柠檬": 9805, "赫尔曼石墙": 9806, "守护神": 9807, "塔罗柯发动机": 0, "利萨斯的旗帜": 9808, "赫尔曼的旗帜": 9809, "男人的友情": 9810, "医学全集": 9811, "雷伊奖章": 9812, "希尔琪奖章": 9813, "瓦古奖章": 9814, "拉包尔之弓": 9815, "毒团子": 9816, "低语的黑铠": 9817}
+const SKILLS := {"加奈美忍法帖": 9800, "妖怪宝具": 9801, "郁金香2号": 9802, "郁金香兵": 9803, "郁金香3号": 9804, "平实柠檬": 9805, "赫尔曼石墙": 9806, "守护神": 9807, "塔罗柯发动机": 0, "利萨斯的旗帜": 9808, "赫尔曼的旗帜": 9809, "男人的友情": 9810, "医学全集": 9811, "雷伊奖章": 9812, "希尔琪奖章": 9813, "瓦古奖章": 9814, "拉包尔之弓": 9815, "毒团子": 9816, "低语的黑铠": 9817, "希露的便当": 9811}
 ## Fired once at the start of round 1.
-const BATTLE_START := ["郁金香2号", "平实柠檬", "赫尔曼石墙", "塔罗柯发动机", "守护神", "医学全集", "毒团子", "低语的黑铠"]
+const BATTLE_START := ["郁金香2号", "平实柠檬", "赫尔曼石墙", "塔罗柯发动机", "守护神", "医学全集", "毒团子", "低语的黑铠", "希露的便当"]
 ## Once-per-run relics: counter 1 marks them spent (saved with the troop, dimmed on the HUD).
-const ONE_SHOT := ["哈尼打火机"]
+const ONE_SHOT := ["哈尼打火机", "希露的祈祷"]
 ## Stacking relics: the counter only grows (saved with the troop, shown on the HUD).
 const STACKING := ["锈蚀的古剑"]
 ## Fired when the player ends the given round, before the enemy turn begins.
@@ -35,6 +35,8 @@ const ELEMENT_AMULETS := {4: "光之护符", 5: "暗之护符"}
 ## 求人票: normal card chests opened on acquisition.
 const JOB_TICKET_CHESTS := 5
 const NORMAL_CHEST := 1
+## 压箱底的宝物: one default-pool relic chest opened on acquisition.
+const HIDDEN_TREASURE := "压箱底的宝物"
 ## 漫画肉: after a victory below this HP percent, heal MEAT_HEAL percent of max HP.
 const MEAT_THRESHOLD := 30.0
 const MEAT_HEAL := 8.0
@@ -127,10 +129,34 @@ const FREEDOM_RATE := 3.0
 const FREEDOM_KINDS := ["hp", "physical", "magic", "physical_resist", "magic_resist", "critical", "combo"]
 ## 锈蚀的古剑: the same troop rates, per elite defeated since it was acquired.
 const RUSTY_SWORD_RATE := 2.0
+## 希露的便当: HP增加率 while held (its battle-start heal reuses 医学全集's skill 9811).
+const BENTO_HP_RATE := 8.0
+## 希露的祈祷: the first card chest opened afterwards echoes one random skill of every card in it.
+const PRAYER := "希露的祈祷"
+
+## 希露的祈祷: claims the relic for a chest being opened (counter 1 marks it spent).
+static func claim_prayer(troop: TroopState) -> bool:
+	if PRAYER not in troop.relics or spent(troop, PRAYER): return false
+	troop.relic_counters[PRAYER] = 1
+	troop.changed.emit()
+	return true
+
+## The skill slot a prayer chest echoes on this card, picked when the chest opens; -1 when the
+## card (or the copy already owned) is enchanted or has no eligible skill.
+static func echo_slot(troop: TroopState, display_name: String, roll: float) -> int:
+	var owned := troop.owned_version(display_name)
+	var slots := CardEnchantments.eligible_slots(troop, display_name if owned.is_empty() else owned)
+	return -1 if slots.is_empty() else slots[mini(int(roll * slots.size()), slots.size() - 1)]
+
+## Enchants the previewed slot of a card taken from a prayer chest; already enchanted cards keep theirs.
+static func echo_card(troop: TroopState, display_name: String, slot: int) -> void:
+	var owned := troop.owned_version(display_name)
+	if slot >= 0 and not owned.is_empty(): troop.enchant_card(owned, slot, CardEnchantments.ECHO)
 
 static func troop_rate_bonus(troop: TroopState, kind: String) -> float:
 	if kind not in FREEDOM_KINDS: return 0.0
 	var bonus := FREEDOM_RATE if "自由的旗帜" in troop.relics else 0.0
+	if kind == "hp" and "希露的便当" in troop.relics: bonus += BENTO_HP_RATE
 	return bonus + RUSTY_SWORD_RATE * int(troop.relic_counters.get("锈蚀的古剑", 0))
 
 ## 锈蚀的古剑: every elite node won adds one stack.
@@ -198,10 +224,13 @@ static func ap_spent(state: BattleState, amount: int) -> void:
 static func acquired(troop: TroopState, name: String) -> void:
 	if name == "中元茶泡饭": troop.reset_card_states()
 	elif name == "盆栽型黄金像": troop.add_gold(BONSAI_GOLD)
-	elif name == "求人票":
+	elif name == PRAYER: troop.spend_gold(troop.gold)
+	elif name in ["求人票", HIDDEN_TREASURE]:
 		var tree := Engine.get_main_loop() as SceneTree
 		var manager := tree.root.get_node_or_null("BattleManager") if tree != null else null
-		if manager != null: manager.queue_treasures(NORMAL_CHEST, JOB_TICKET_CHESTS)
+		if manager == null: return
+		if name == HIDDEN_TREASURE: manager.queue_treasures(manager.RELIC_CHEST, 1)
+		else: manager.queue_treasures(NORMAL_CHEST, JOB_TICKET_CHESTS)
 
 static func turn_end(state: BattleState) -> void:
 	var actions: Array[Dictionary] = []
@@ -242,6 +271,17 @@ static func player_damaged(state: BattleState) -> void:
 	state.pending_counter_feedback.append({"damage": maxf(0.0, before - state.enemy_hp), "skill": int(skill.id)})
 	BattleSupports.after_action(state, "player")
 	state._check_result()
+
+## How a triggered relic is presented: "attack" relics play their own skill animation;
+## neighbouring "support" (configure or remove supports) and "effect" relics release together.
+static func category(state: BattleState, entry: Dictionary) -> String:
+	var skill: Dictionary = state.troop.catalog.skills.get(int(entry.id), {})
+	if skill.is_empty(): return "effect"
+	var codes: Array[int] = []
+	for n: int in range(1, 4): codes.append(int(skill["effect%d" % n]))
+	if 1 in codes: return "attack"
+	if codes.any(func(code: int) -> bool: return code >= 30 and code <= 36): return "support"
+	return "effect"
 
 static func _dispatch(state: BattleState, actions: Array[Dictionary]) -> void:
 	if state.animate_automatic_skills:

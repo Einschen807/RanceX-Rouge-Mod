@@ -8,6 +8,8 @@ var last_turn: Dictionary = {}
 var acted: Dictionary = {}
 ## Exhaustion inherited when an upgrade changes a once-only skill's AP type.
 var inherited_limits: Dictionary = {}
+## (actor, slot) -> enchantment name; set by the owning TroopState. Monsters have none.
+var enchantment_lookup: Callable
 var rng := RandomNumberGenerator.new()
 
 func _init() -> void:
@@ -28,7 +30,9 @@ func replace_card(before: Dictionary, after: Dictionary, catalog: CardCatalog) -
 		var old_key := _key(before.name, old_skill, slot)
 		var new_key := _key(after.name, new_skill, slot)
 		var limit := int(inherited_limits.get(old_key, 0))
-		if old_skill.ap_type == 4 and int(run_uses.get(old_key, 0)) > 0: limit = 4
+		# Card settings move before the runtime, so the enchantment is already under the new name.
+		if CardEnchantments.ap_type_override(enchantment(after.name, slot)) > 0: pass
+		elif old_skill.ap_type == 4 and int(run_uses.get(old_key, 0)) > 0: limit = 4
 		elif old_skill.ap_type == 5 and int(battle_uses.get(old_key, 0)) > 0 and limit != 4: limit = 5
 		if limit != 0: inherited_limits[new_key] = limit
 		inherited_limits.erase(old_key)
@@ -36,6 +40,14 @@ func replace_card(before: Dictionary, after: Dictionary, catalog: CardCatalog) -
 			if counters.has(old_key):
 				counters[new_key] = counters[old_key]
 				counters.erase(old_key)
+
+## "Reset card states" for one card: uses, once-only limits and AP accumulation of both
+## skill slots return to their initial state. This turn's action flag is kept.
+func reset_card(actor: String) -> void:
+	var prefix := actor + ":"
+	for counters: Dictionary in [run_uses, battle_uses, last_turn, inherited_limits]:
+		for key: String in counters.keys():
+			if key.begins_with(prefix): counters.erase(key)
 
 func begin_battle() -> void:
 	turn = 1
@@ -57,34 +69,58 @@ func reset_floor() -> void:
 	inherited_limits.clear()
 	begin_battle()
 
-func ap_cost(actor: String, skill: Dictionary, slot: int = 0) -> int:
-	return _cost_for_key(_key(actor, skill, slot), skill)
+func enchantment(actor: String, slot: int) -> String:
+	return String(enchantment_lookup.call(actor, slot)) if enchantment_lookup.is_valid() else ""
 
-func _cost_for_key(key: String, skill: Dictionary) -> int:
+## Base AP after enchantments; accumulation and penalties still add on top of it.
+func base_ap(actor: String, skill: Dictionary, slot: int = 0) -> int:
+	return maxi(0, int(skill.ap) - CardEnchantments.ap_reduction(enchantment(actor, slot)))
+
+## Extra releases owed by the use just recorded (回响: the first use this battle).
+func enchantment_repeats(actor: String, skill: Dictionary, slot: int = 0) -> int:
+	if int(battle_uses.get(_key(actor, skill, slot), 0)) != 1: return 0
+	return CardEnchantments.first_use_repeats(enchantment(actor, slot))
+
+## AP type after enchantments (an enchantment may turn any skill into AP累计).
+func ap_type(actor: String, skill: Dictionary, slot: int = 0) -> int:
+	var override := CardEnchantments.ap_type_override(enchantment(actor, slot))
+	return override if override > 0 else int(skill.ap_type)
+
+func ap_cost(actor: String, skill: Dictionary, slot: int = 0) -> int:
+	return _cost_for_key(_key(actor, skill, slot), skill, actor, slot)
+
+func _cost_for_key(key: String, skill: Dictionary, actor: String, slot: int) -> int:
 	if skill.action != 1:
 		return 0
-	match int(skill.ap_type):
-		1: return int(skill.ap) + (1 if last_turn.get(key, -1) in [turn, turn - 1] else 0)
-		2: return int(skill.ap) + int(run_uses.get(key, 0))
-		3: return int(skill.ap) + int(battle_uses.get(key, 0))
-	return int(skill.ap)
+	var base := base_ap(actor, skill, slot)
+	match ap_type(actor, skill, slot):
+		1:
+			var streak: bool = last_turn.get(key, -1) in [turn, turn - 1] and CardEnchantments.streak_penalty(enchantment(actor, slot))
+			return base + (1 if streak else 0)
+		2: return base + int(run_uses.get(key, 0))
+		3: return base + int(battle_uses.get(key, 0))
+	return base
 
 ## All card views read the same live state. Upgrade previews retain the source
 ## counters by slot without mutating inventory or transferring runtime records.
 func display_state(actor: String, skill: Dictionary, slot: int = 0, source_skill: Dictionary = {}) -> Dictionary:
 	var source := skill if source_skill.is_empty() else source_skill
 	var key := _key(actor, source, slot)
-	var amount := _cost_for_key(key, skill)
-	var spent: bool = is_spent(actor, source, slot) or (skill.ap_type == 4 and run_uses.get(key, 0) > 0) or (skill.ap_type == 5 and battle_uses.get(key, 0) > 0)
+	var base := base_ap(actor, skill, slot)
+	var amount := _cost_for_key(key, skill, actor, slot)
+	var type := ap_type(actor, skill, slot)
+	var spent: bool = is_spent(actor, source, slot) or (type == 4 and run_uses.get(key, 0) > 0) or (type == 5 and battle_uses.get(key, 0) > 0)
 	var palette := "white"
-	if amount > int(skill.ap):
-		if int(skill.ap_type) in [2, 3]: palette = "purple"
-		elif int(skill.ap_type) == 1: palette = "orange"
+	if amount > base:
+		if type in [2, 3]: palette = "purple"
+		elif type == 1: palette = "orange"
 	return {"amount": amount, "spent": spent, "palette": palette, "text": str(amount) if skill.action == 1 else "—"}
 
 func is_spent(actor: String, skill: Dictionary, slot: int = 0) -> bool:
 	var key := _key(actor, skill, slot)
-	return inherited_limits.has(key) or (skill.ap_type == 4 and run_uses.get(key, 0) > 0) or (skill.ap_type == 5 and battle_uses.get(key, 0) > 0)
+	if turn > 1 and CardEnchantments.first_turn_only(enchantment(actor, slot)): return true
+	var type := ap_type(actor, skill, slot)
+	return inherited_limits.has(key) or (type == 4 and run_uses.get(key, 0) > 0) or (type == 5 and battle_uses.get(key, 0) > 0)
 
 func can_use(actor: String, skill: Dictionary, context: Dictionary, slot: int = 0) -> bool:
 	if skill.action == 3 or not SkillBaseEffects.condition_met(skill.condition, context):
@@ -110,7 +146,11 @@ func use_skill(actor: String, skill: Dictionary, context: Dictionary, slot: int 
 	last_turn[key] = turn
 	run_uses[key] = int(run_uses.get(key, 0)) + 1
 	battle_uses[key] = int(battle_uses.get(key, 0)) + 1
-	return {"ok": true, "commands": resolve_commands(skill, context), "ap_spent": spent, "effect_asset": skill.effect_asset, "cut_in": skill.get("cut_in", "")}
+	var commands := resolve_commands(skill, context)
+	for command: Dictionary in CardEnchantments.release_commands(enchantment(actor, slot)):
+		command.merge({"actor": context.get("actor", ""), "actor_identity": context.get("actor_identity", ""), "actor_slot": context.get("actor_slot", -1), "support_source": false})
+		commands.append(command)
+	return {"ok": true, "commands": commands, "ap_spent": spent, "effect_asset": skill.effect_asset, "cut_in": skill.get("cut_in", "")}
 
 static func resolve_commands(skill: Dictionary, context: Dictionary) -> Array[Dictionary]:
 	var commands := SkillBaseEffects.resolve(skill, context)

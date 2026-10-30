@@ -46,6 +46,9 @@ var _bonus_button: OriginalUiButton
 var _bonus_buttons: Array[Button] = []
 var _bonus_rank: OriginalBitmapNumber
 var _bonus_points: OriginalBitmapNumber
+var _card_tips: Array[RelicTooltip] = []
+## Card selection screens (enchanting) decide which cards are refused; upgrades use their + record.
+var selection_check: Callable
 
 func configure(state: TroopState) -> void:
 	troop = state
@@ -202,6 +205,7 @@ func _refresh() -> void:
 	for slot: int in _flights.keys():
 		if troop.leaders[slot] != _flights[slot].card:
 			_cancel_flight(slot)
+	_hide_card_tips()
 	_clear(_leader_area)
 	for i: int in range(7):
 		var at := Vector2(i * 220, 0)
@@ -285,14 +289,60 @@ func _card(record: Dictionary, is_leader: bool) -> CardWidget:
 	var widget := CardWidget.new()
 	widget.setup(record, troop, is_leader, detail_mode, preview_upgrades)
 	widget.set_meta("upgrade_selection", upgrade_selection)
+	if selection_check.is_valid(): widget.set_meta("selection_check", selection_check)
 	widget.leader_selected = is_leader and record.faction == selected_faction
 	widget.card_clicked.connect(_on_card_clicked)
 	widget.leader_removed.connect(_undeploy)
 	widget.card_dropped.connect(_deploy)
+	widget.mouse_entered.connect(_show_card_tips.bind(widget))
+	widget.mouse_exited.connect(_hide_card_tips)
 	return widget
+
+## Enchantment first, then each support the card's skills configure, in skill order.
+func _card_tip_records(widget: CardWidget) -> Array[Dictionary]:
+	var records: Array[Dictionary] = []
+	var entry := CardEnchantments.of_card(troop.card_settings, widget.card.name)
+	if not entry.is_empty(): records.append(CardEnchantments.shared().by_name.get(entry.name, {"name": entry.name, "description": ""}))
+	var seen: Array[int] = []
+	for slot: int in range(2):
+		var skill: Dictionary = catalog.skills.get(int(widget.display_card.get("skill%d" % (slot + 1), 0)), {})
+		for id: int in SupportCatalog.configured_by(skill):
+			if id in seen or not catalog.supports.has(id): continue
+			seen.append(id)
+			var support: Dictionary = catalog.supports[id]
+			var heading: String = support.name if int(support.rounds) <= 0 else "%s  持续%d回合" % [support.name, int(support.rounds)]
+			records.append({"name": heading, "description": support.description})
+	return records
+
+## Skill-description view: enchantments and configured supports explained beside the card, like relics.
+func _show_card_tips(widget: CardWidget) -> void:
+	_hide_card_tips()
+	if detail_mode != 2 or _drag_art != null or not is_instance_valid(widget): return
+	var records := _card_tip_records(widget)
+	if records.is_empty(): return
+	while _card_tips.size() < records.size():
+		var tip := RelicTooltip.new()
+		tip.name = "CardTooltip%d" % _card_tips.size()
+		tip.top_level = true
+		add_child(tip)
+		_card_tips.append(tip)
+	var rect := widget.get_global_rect()
+	var step := _card_tips[0].size.y + 8.0
+	var x := rect.end.x + 12.0
+	if x + _card_tips[0].size.x > 1912.0: x = rect.position.x - 12.0 - _card_tips[0].size.x
+	# Keep the whole stack on screen (RelicTooltip clamps each box to y ≤ 885).
+	var y := maxf(8.0, minf(rect.position.y, 885.0 - step * (records.size() - 1)))
+	for i: int in range(records.size()):
+		_card_tips[i].show_record(records[i], Vector2(x, y + step * i))
+		move_child(_card_tips[i], -1)
+
+func _hide_card_tips() -> void:
+	for tip: RelicTooltip in _card_tips:
+		if is_instance_valid(tip): tip.hide()
 
 func _on_card_clicked(display_name: String, is_leader: bool) -> void:
 	if not _return_name.is_empty() or _transitioning or _flip_locked: return
+	_hide_card_tips()
 	if upgrade_selection:
 		if not _transitioning and not _flip_locked: upgrade_selected.emit(display_name)
 		return
@@ -498,6 +548,7 @@ func _cycle_details() -> void:
 	if not _return_name.is_empty() or _flip_locked or _transitioning or _drag_art != null:
 		return
 	_flip_locked = true
+	_hide_card_tips()
 	detail_mode = (detail_mode + 1) % 3
 	for parent: Node in [_leader_area, _grid]:
 		for child: Node in parent.get_children():

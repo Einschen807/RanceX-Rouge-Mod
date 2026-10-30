@@ -4,6 +4,39 @@ var active: EventScreen
 var context: ForcedEventSession
 var _layer: CanvasLayer
 var _previous_run_troop: TroopState
+## 「赌场」 roulette table opened by `roulette 50|100|all`; the event waits until it closes
+## and then shows last_roulette_message as the result.
+var roulette: RouletteScreen
+var last_roulette_message := ""
+var _roulette_layer: CanvasLayer
+
+func launch_roulette(mode: String, troop: TroopState) -> String:
+	if mode not in ["50", "100", "all"]: return "用法：roulette 50|100|all"
+	if is_instance_valid(roulette) or get_node("/root/ScreenTransition").busy: return "当前不能开始轮盘。"
+	if troop == null: return "部队数据加载失败。"
+	var stake := troop.gold if mode == "all" else int(mode)
+	if stake <= 0 or troop.gold < stake: return "贝壳不足：需要%d，持有%d。" % [maxi(stake, 1), troop.gold]
+	last_roulette_message = ""
+	_roulette_layer = CanvasLayer.new()
+	_roulette_layer.layer = 60
+	add_child(_roulette_layer)
+	roulette = RouletteScreen.new()
+	roulette.troop = troop
+	roulette.mode = mode
+	roulette.finished.connect(_close_roulette)
+	_roulette_layer.add_child(roulette)
+	return "开始轮盘：押注%d贝壳。" % stake
+
+func _close_roulette(message: String) -> void:
+	last_roulette_message = message
+	# A lost bet leaves 叶月 grinning on the event page behind the table, too.
+	if roulette.lost:
+		for node: Node in get_tree().get_nodes_in_group("modal_overlay"):
+			var art := node.get_node_or_null("EventImage") as TextureRect if node is EventScreen else null
+			if art != null and art.texture != null and art.texture.resource_path.ends_with("/赌场.png"): art.texture = load("res://assets/events/赌场_笑.png")
+	roulette = null
+	if is_instance_valid(_roulette_layer): _roulette_layer.queue_free()
+	_roulette_layer = null
 
 func launch(identity: String, definition_path := "res://data/events.txt") -> String:
 	if identity.is_empty(): return "用法：event 事件名"

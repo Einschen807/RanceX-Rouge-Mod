@@ -4,17 +4,21 @@ var active: ShopScreen
 var layer: CanvasLayer
 var node_shop := false
 
-func launch() -> String:
+## Themed shops opened by `shop 名称` (events); each keeps the normal shop rules.
+const VARIANTS := {"米莉": "米莉的小店"}
+
+func launch(variant := "") -> String:
+	if not variant.is_empty() and not VARIANTS.has(variant): return "未找到商店：" + variant
 	if not _can_open(): return "当前界面不能进入商店。"
 	var session := get_node("/root/RunSession")
-	if session.active and session.pending.get("type") == "shop":
+	if variant.is_empty() and session.active and session.pending.get("type") == "shop":
 		open_node(session.pending.inventory)
 	else:
 		var troop: TroopState = get_node("/root/BattleManager").current_troop()
 		var inventory := ShopInventory.generate(troop, get_node("/root/RunAutosave").rng)
 		if not ShopInventory.valid(inventory, troop.catalog): return "商店数据加载失败。"
-		_open(troop, inventory, false)
-	return "进入商店。"
+		_open(troop, inventory, false, variant)
+	return "进入商店。" if variant.is_empty() else "进入%s。" % VARIANTS[variant]
 
 func _can_open() -> bool:
 	var manager := get_node("/root/BattleManager")
@@ -24,12 +28,12 @@ func open_node(inventory: Dictionary) -> void:
 	if not _can_open(): return
 	_open(get_node("/root/RunSession").troop, ShopInventory.from_saved(inventory), true)
 
-func _open(troop: TroopState, inventory: Dictionary, from_node: bool) -> void:
+func _open(troop: TroopState, inventory: Dictionary, from_node: bool, variant := "") -> void:
 	node_shop = from_node
 	layer = CanvasLayer.new()
 	layer.layer = 70
 	add_child(layer)
-	active = ShopScreen.new()
+	active = MilliShopScreen.new() if variant == "米莉" else ShopScreen.new()
 	active.troop = troop
 	active.stock = inventory
 	active.close_requested.connect(close)

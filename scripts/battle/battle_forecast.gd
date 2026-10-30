@@ -36,6 +36,7 @@ static func snapshot(source: BattleState) -> BattleState:
 	copy.monster = source.monster.duplicate(true)
 	copy.runtime = _runtime(source.runtime)
 	formation.skill_runtime = copy.runtime
+	copy.runtime.enchantment_lookup = formation.enchantment
 	copy.enemy_runtime = _runtime(source.enemy_runtime)
 	copy.intent = source.intent.duplicate(true)
 	copy.abilities.assign(source.abilities.duplicate(true))
@@ -48,6 +49,7 @@ static func snapshot(source: BattleState) -> BattleState:
 	copy.pending_skill_repeats.assign(source.pending_skill_repeats.duplicate(true))
 	copy.enemy_blocks.assign(source.enemy_blocks)
 	copy.bonus_gold = source.bonus_gold
+	copy.down_exits = source.down_exits
 	copy.pending_card_levels = source.pending_card_levels.duplicate(true)
 	copy.pending_enemy_skill = source.pending_enemy_skill
 	copy.pending_enemy_commands.assign(source.pending_enemy_commands.duplicate(true))

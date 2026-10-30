@@ -77,6 +77,8 @@ func load_catalog(skills: Dictionary, monster_path: String = "res://data/monster
 			continue
 		if not ResourceLoader.exists("res://assets/monsters/%s.png" % monster.portrait) or not ResourceLoader.exists("res://assets/battle/backgrounds/%s.png" % monster.background):
 			errors.append("怪物立绘或战斗背景不存在：" + monster.identity)
+		# Analysis text follows the other data files: a lowercase r is a line break.
+		monster.analysis = String(monster.analysis).replace("r", "\n")
 		monsters[monster.identity] = monster
 	if not errors.is_empty():
 		monsters.clear()

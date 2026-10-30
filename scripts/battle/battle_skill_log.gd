@@ -31,6 +31,7 @@ static func suffix(state: BattleState, commands: Array) -> String:
 			"queen": details.append("合计额外释放%d次" % int(total))
 			"counter": details.append("反击合计%s倍" % number(total))
 			"support_shield": details.append("生成支援合计获得%s%%护盾" % number(total))
+			"down_shield": details.append("进入DOWN合计获得%s%%护盾" % number(total))
 	return "（%s）" % "，".join(details) if not details.is_empty() else ""
 
 static func skill_name(state: BattleState, skill: Dictionary, commands: Array) -> String:

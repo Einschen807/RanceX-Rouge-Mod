@@ -79,6 +79,7 @@ static func restore(source: BattleState, data: Dictionary) -> BattleState:
 	result.doushin_target_count = int(data.fields.get("doushin_target_count", 1))
 	result.abilities.assign(data.fields.get("abilities", []).duplicate(true))
 	result.ability_rules = data.fields.get("ability_rules", BattleAbilities.fresh_rules()).duplicate(true)
+	result.ability_rules.merge(BattleAbilities.fresh_rules())
 	result.center_boost_enabled = bool(data.fields.get("center_boost_enabled", false))
 	result.delayed_recoveries.assign(data.fields.get("delayed_recoveries", []).duplicate(true))
 	result.last_friendly_skill = data.fields.get("last_friendly_skill", {}).duplicate(true)

@@ -22,7 +22,7 @@ static func validate(commands: PackedStringArray, troop: TroopState, session: No
 				if gold < int(argument): return "贝壳不足：需要%d，持有%d。" % [int(argument), gold]
 				gold -= int(argument)
 			"maxhp":
-				if not argument.is_valid_int() or int(argument) <= 0 or int(argument) > 100: return "用法：maxhp 1～100（最大HP增加百分比）"
+				if not argument.is_valid_int() or int(argument) <= 0 or int(argument) > 100: return "用法：maxhp 1～100（HP增加率提升百分比）"
 			"heal":
 				if not session.active or not argument.is_valid_int() or int(argument) <= 0 or int(argument) > 100: return "用法：heal 1～100（恢复最大HP百分比，需在冒险中）"
 			"add", "delet", "delete":
@@ -70,8 +70,18 @@ static func validate(commands: PackedStringArray, troop: TroopState, session: No
 				for name: String in names:
 					if not relics.by_name.has(name): return "未找到遗物：" + name
 			"upgrade":
-				if not argument.is_empty() and (not argument.is_valid_int() or int(argument) <= 0): return "用法：upgrade [正整数数量]"
-			"shop", "help": pass
+				if argument.to_lower() == "initial":
+					if not session.active: return "upgrade initial 需在冒险中使用。"
+				elif not argument.is_empty() and (not argument.is_valid_int() or int(argument) <= 0): return "用法：upgrade [正整数数量] / upgrade initial"
+			"roulette":
+				var stake := gold if argument.to_lower() == "all" else (int(argument) if argument in ["50", "100"] else -1)
+				if stake < 0: return "用法：roulette 50|100|all"
+				if stake <= 0 or gold < stake: return "贝壳不足：需要%d，持有%d。" % [maxi(stake, 1), gold]
+				# The outcome is unknown beforehand; later commands see the worst case.
+				gold -= stake
+			"shop":
+				if not argument.is_empty() and (session == null or not session.get_node("/root/ShopManager").VARIANTS.has(argument)): return "未找到商店：" + argument
+			"help": pass
 			_: return "未知命令：" + command
 	return ""
 
@@ -105,9 +115,11 @@ static func execute(source: String, session: Node) -> Dictionary:
 		messages.append(result.message)
 		var launched_battle := command.strip_edges().split(" ", false, 1)[0].to_lower() == "battle"
 		# Commands that open a screen finish that screen before the next command.
-		while transition.busy or is_instance_valid(battle.active) or is_instance_valid(battle._upgrade) or is_instance_valid(battle._treasure) or is_instance_valid(battle._relic_chest) or is_instance_valid(shop.active) or (is_instance_valid(events.active) and events.active.session != session):
+		while transition.busy or is_instance_valid(battle.active) or is_instance_valid(battle._upgrade) or is_instance_valid(battle._treasure) or is_instance_valid(battle._relic_chest) or is_instance_valid(shop.active) or is_instance_valid(events.roulette) or (is_instance_valid(events.active) and events.active.session != session):
 			await tree.process_frame
 			if not is_instance_valid(session) or not session.active or session.defeated or session.pending != pending: return {"ok": false, "message": "事件已关闭。", "completed": completed}
+		# The roulette result replaces its launch message once the table closes.
+		if command.strip_edges().split(" ", false, 1)[0].to_lower() == "roulette" and not events.last_roulette_message.is_empty(): messages[messages.size() - 1] = events.last_roulette_message
 		# Rewards after a battle are a prize for winning it; a loss or timeout ends the sequence.
 		if launched_battle and battle.last_outcome != "胜利":
 			messages.append("战斗未获胜，后续奖励取消。")

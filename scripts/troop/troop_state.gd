@@ -16,7 +16,7 @@ var catalog: CardCatalog
 var available: Array[Dictionary] = []
 var leaders: Array[String] = ["", "", "", "", "", "", ""]
 var levels: Dictionary = {}
-## Instance settings are independent of the catalog version (future enchantments, etc.).
+## Instance settings are independent of the catalog version (enchantments, etc.).
 var card_settings: Dictionary = {}
 var ox_coefficient := 5.0
 var bonuses: Dictionary = {}
@@ -49,6 +49,23 @@ const BONUS_NAMES := ["增加领队格子 +1", "增加领队格子 +1", "增加�
 ## Keep stable saved bonus IDs; retired choices are never displayed or acquired.
 const BONUS_IDS := [0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 12, 13, 14, 15]
 
+func _init() -> void:
+	skill_runtime.enchantment_lookup = enchantment
+
+## Enchantment name on one skill slot of an owned card ("" when none).
+func enchantment(display_name: String, slot: int) -> String:
+	return CardEnchantments.of_skill(card_settings, display_name, slot)
+
+## One enchantment per card: refused once any of its skills is enchanted or the slot fails the requirement.
+func enchant_card(display_name: String, slot: int, enchantment_name: String, requirement: Dictionary = {}) -> bool:
+	if not has_card(display_name) or not CardEnchantments.shared().by_name.has(enchantment_name): return false
+	if slot not in CardEnchantments.eligible_slots(self, display_name, requirement): return false
+	var settings: Dictionary = card_settings.get(display_name, {}) if card_settings.get(display_name) is Dictionary else {}
+	settings[CardEnchantments.SETTING] = {"name": enchantment_name, "slot": slot}
+	card_settings[display_name] = settings
+	changed.emit()
+	return true
+
 ## "Reset card states" restores skill uses/AP costs, preserving card instance settings.
 func reset_card_states() -> void:
 	skill_runtime.reset_floor()
@@ -71,6 +88,18 @@ func acquire_curse(display_name: String) -> bool:
 func add_max_hp_bonus(percent: int) -> void:
 	if percent <= 0: return
 	max_hp_bonus += percent
+	changed.emit()
+
+## Troop rates the Milli shop takes as payment. They may go below zero with no floor:
+## negative resistances take more damage, a negative HP增加率 shrinks the maximum HP.
+const RATE_PAYMENTS := ["physical_resist", "magic_resist", "hp"]
+const RATE_NAMES := {"physical_resist": "物理抗性", "magic_resist": "魔法抗性", "hp": "HP增加率"}
+
+func spend_rate(kind: String, amount: int) -> void:
+	match kind:
+		"physical_resist": resistance_rates.physical = float(resistance_rates.physical) - amount
+		"magic_resist": resistance_rates.magic = float(resistance_rates.magic) - amount
+		"hp": max_hp_bonus -= amount
 	changed.emit()
 
 func spend_gold(amount: int) -> bool:
@@ -147,7 +176,9 @@ func upgrade_card(display_name: String) -> bool:
 	if after.name == before.name:
 		levels[display_name] = level(display_name) + 5
 	else:
-		return set_card_upgraded(display_name, true)
+		if not set_card_upgraded(display_name, true): return false
+		# An upgraded card starts fresh: used limits and AP accumulation reset with it.
+		skill_runtime.reset_card(after.name)
 	changed.emit()
 	return true
 
@@ -243,7 +274,8 @@ func total(stat: String, preview_upgrades: bool = false) -> float:
 	for display_name: String in leaders:
 		if not display_name.is_empty():
 			sum += deployed(catalog.find_name(display_name), stat, preview_upgrades)
-	return sum * (1.0 + rate("hp") / 100.0) if stat == "hp" else sum
+	# HP增加率 at -100% or below leaves no HP at all.
+	return sum * maxf(0.0, 1.0 + rate("hp") / 100.0) if stat == "hp" else sum
 
 func deploy(display_name: String, target: int = -1) -> bool:
 	if display_name in leaders:

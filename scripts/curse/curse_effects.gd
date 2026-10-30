@@ -2,7 +2,7 @@ extends RefCounted
 class_name CurseEffects
 ## Rules for held curses, mirroring RelicEffects. Curses execute in acquisition order.
 ## Fired once when the battle starts (before round 1); skills come from data/skills.txt.
-const BATTLE_START := {"撑着了": 9818}
+const BATTLE_START := {"撑着了": 9818, "受伤": 9819}
 ## 利滚利: every shop price is multiplied by this rate (after other discounts).
 const PRICE_RATES := {"利滚利": 1.2}
 

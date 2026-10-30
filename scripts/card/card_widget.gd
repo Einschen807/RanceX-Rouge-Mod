@@ -18,6 +18,8 @@ var leader_selected := false
 var detail_mode := 0
 var portrait_only := false
 var skill_costs: Dictionary = {}
+## Enchantments to show before the card owns them (slot -> name), e.g. a 希露的祈祷 chest.
+var preview_enchantments: Dictionary = {}
 var visual: Control
 var flipping := false
 var dragging := false
@@ -67,7 +69,9 @@ func selection_blocked() -> bool:
 
 ## Upgrade selection keeps these cards clickable so the screen can explain why they are refused.
 func upgrade_exhausted() -> bool:
-	return get_meta("upgrade_selection", false) and troop.catalog.upgrade_preview(card).name == card.name
+	if not get_meta("upgrade_selection", false): return false
+	if has_meta("selection_check"): return not (get_meta("selection_check") as Callable).call(card.name)
+	return troop.catalog.upgrade_preview(card).name == card.name
 
 func set_leader_selected(value: bool) -> void:
 	leader_selected = value
@@ -220,8 +224,11 @@ func _skill(index: int, y: int, description: bool) -> void:
 		skill_name.add_theme_font_size_override("font_size", 17)
 		skill_name.add_theme_constant_override("outline_size", 2)
 	if description:
-		var text := FormationArt.label(visual, s.description, Vector2(13, y + 53), Vector2(190, 96), 16)
+		var enchantment := troop.enchantment(card.name, index)
+		if enchantment.is_empty(): enchantment = String(preview_enchantments.get(index, ""))
+		var text := FormationArt.label(visual, s.description + CardEnchantments.suffix(enchantment), Vector2(13, y + 53), Vector2(190, 96), 16)
 		text.name = "SkillDescription%d" % (index + 1)
+		if not enchantment.is_empty(): text.set_meta("enchant_from", String(s.description).length())
 		text.add_theme_font_override("font", DESCRIPTION_FONT)
 		text.add_theme_color_override("font_color", Color.WHITE)
 		text.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
@@ -239,6 +246,7 @@ func _skill(index: int, y: int, description: bool) -> void:
 			if text.get_visible_line_count() >= text.get_line_count():
 				break
 		if preview_upgrades: UpgradePreviewText.apply(text, String(original.get("description", "")))
+		elif not enchantment.is_empty(): UpgradePreviewText.apply(text, String(s.description))
 
 func _native_number(tag: String, digits: String, value: String, at: Vector2, dimensions: Vector2) -> OriginalBitmapNumber:
 	var number := OriginalBitmapNumber.make(visual, digits, at, dimensions)

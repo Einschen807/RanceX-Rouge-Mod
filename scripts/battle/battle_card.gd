@@ -136,7 +136,8 @@ func _skill(index: int, descriptions: bool) -> void:
 		BattleArt.label(button.content, skill.name, Vector2(inset + 37, 4 + header_y), Vector2(160, 36), 21, FormationArt.GOLD)
 	_cost(button.content, skill, Vector2(73 if descriptions else 63, (21 if descriptions else 43) + header_y), index)
 	if descriptions:
-		var text := BattleArt.label(button.content, skill.description, Vector2(18, 71), Vector2(192, 77), 15)
+		var enchantment := battle.troop.enchantment(card.name, index)
+		var text := BattleArt.label(button.content, skill.description + CardEnchantments.suffix(enchantment), Vector2(18, 71), Vector2(192, 77), 15)
 		text.name = "SkillDescription"
 		text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		text.vertical_alignment = VERTICAL_ALIGNMENT_TOP
@@ -145,6 +146,7 @@ func _skill(index: int, descriptions: bool) -> void:
 		for font_size: int in range(15, 11, -1):
 			text.add_theme_font_size_override("font_size", font_size)
 			if text.get_line_count() <= 4 and text.get_visible_line_count() >= text.get_line_count(): break
+		if not enchantment.is_empty(): UpgradePreviewText.apply(text, String(skill.description), String(skill.description).length())
 	skill_buttons.append(button)
 
 func _detail_frame(button: OriginalUiButton) -> void:

@@ -10,7 +10,8 @@ const GRID_WIDTH := COLUMNS * 104.0 + (COLUMNS - 1) * 14.0
 const HEADER := 44.0
 ## Keeps first-column names inside the scroll clip.
 const INSET := 10.0
-const RARITY_COLORS := [Color("b9b4a6"), Color("6fb2e6"), Color("f2c75c"), Color("8fd47a"), Color("d38ff0")]
+const RARITY_COLORS := [Color("b9b4a6"), Color("6fb2e6"), Color("f2c75c"), Color("8fd47a"), Color("d38ff0"), Color("f59fbf")]
+const AID := 6
 var database := RelicCatalog.new()
 var tip: RelicTooltip
 var filter := 0
@@ -90,18 +91,35 @@ func show_filter(index: int, animated := true) -> void:
 		rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_content.add_child(rule)
 		y += HEADER + 6
-		for i: int in range(records.size()):
-			var at := Vector2(INSET + (i % COLUMNS) * (TILE.x + GAP.x), y + (i / COLUMNS) * (TILE.y + GAP.y))
-			var tile := _tile(records[i], at)
-			if animated:
-				tile.modulate.a = 0.0
-				# Cap the stagger so a hundred relics still settle quickly.
-				tile.create_tween().tween_property(tile, "modulate:a", 1.0, 0.16).set_delay(minf(0.012 * order, 0.4))
-			order += 1
-		var rows := ceili(records.size() / float(COLUMNS))
-		y += rows * TILE.y + (rows - 1) * GAP.y + 30
+		for group: Array in (_aid_groups(records) if rarity == AID else [["", records]]):
+			var members: Array = group[1]
+			if not String(group[0]).is_empty():
+				var person := BattleArt.label(_content, "%s  %d" % [group[0], members.size()], Vector2(INSET + 12, y), Vector2(320, 34), 22, RARITY_COLORS[AID - 1].lightened(0.25))
+				person.name = "Person_" + String(group[0])
+				y += 40
+			for i: int in range(members.size()):
+				var at := Vector2(INSET + (i % COLUMNS) * (TILE.x + GAP.x), y + (i / COLUMNS) * (TILE.y + GAP.y))
+				var tile := _tile(members[i], at)
+				if animated:
+					tile.modulate.a = 0.0
+					# Cap the stagger so a hundred relics still settle quickly.
+					tile.create_tween().tween_property(tile, "modulate:a", 1.0, 0.16).set_delay(minf(0.012 * order, 0.4))
+				order += 1
+			var rows := ceili(members.size() / float(COLUMNS))
+			y += rows * TILE.y + (rows - 1) * GAP.y + 30
 	_content.custom_minimum_size = Vector2(_scroll.size.x, y)
 	_scrollbar.visible = _content.custom_minimum_size.y > _scroll.size.y
+
+## 援助 relics split by the aid person listing them in data/aids.txt; unlisted ones come last.
+func _aid_groups(records: Array) -> Array:
+	var aids := AidCatalog.shared()
+	var groups: Array = []
+	for person: String in aids.order:
+		var members := records.filter(func(record: Dictionary) -> bool: return aids.owner_of(record.name) == person)
+		if not members.is_empty(): groups.append([person, members])
+	var unlisted := records.filter(func(record: Dictionary) -> bool: return aids.owner_of(record.name).is_empty())
+	if not unlisted.is_empty(): groups.append(["未登记", unlisted])
+	return groups
 
 func _tile(record: Dictionary, at: Vector2) -> Control:
 	var tile := Control.new()

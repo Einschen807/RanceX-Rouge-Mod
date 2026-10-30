@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 32 32">
+  <!-- Pushpin for the relic drawer: red glossy head, collar and steel needle, pointing down. -->
+  <defs>
+    <radialGradient id="head" cx="13" cy="7" r="11" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ff9a8c"/>
+      <stop offset="0.45" stop-color="#d4252b"/>
+      <stop offset="1" stop-color="#6e0c12"/>
+    </radialGradient>
+    <linearGradient id="needle" x1="15" y1="0" x2="17" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f4f6f8"/>
+      <stop offset="1" stop-color="#7f868e"/>
+    </linearGradient>
+  </defs>
+  <path d="M15.2 19 L16 30.5 L16.8 19 Z" fill="url(#needle)" stroke="#3a3f45" stroke-width="0.4"/>
+  <path d="M10 15.5 Q16 13 22 15.5 L21 19.5 Q16 21 11 19.5 Z" fill="#a8141b" stroke="#4b080c" stroke-width="0.6"/>
+  <path d="M12.5 4.5 Q16 2.5 19.5 4.5 L18.5 14.5 Q16 15.5 13.5 14.5 Z" fill="url(#head)" stroke="#4b080c" stroke-width="0.6"/>
+  <ellipse cx="16" cy="4.2" rx="5.2" ry="2.6" fill="url(#head)" stroke="#4b080c" stroke-width="0.6"/>
+  <ellipse cx="14.4" cy="3.6" rx="1.8" ry="0.8" fill="#ffffff" fill-opacity="0.7"/>
+</svg>

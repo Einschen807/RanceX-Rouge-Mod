@@ -211,7 +211,8 @@ func _show_pending() -> void:
 				else: _reward_screen()
 			else: _launch_battle.call_deferred()
 		"ancient":
-			_start_floor()
+			if session.pending.has("aid") and _modal_kind != "aid": _open_aid()
+			elif not session.pending.has("aid"): _start_floor()
 		"chest":
 			_show_loot(1, false)
 		"rest": _rest_screen()
@@ -238,6 +239,30 @@ func _start_floor() -> void:
 		_theme_banner.map_theme = session.map_theme()
 		_theme_banner.finished.connect(func() -> void: _theme_banner = null)
 		add_child(_theme_banner)
+
+## Floor-entrance aid opens like an event (under a running blackout, or with its own fade);
+## after 继续 the floor starts as usual, introduction banner included.
+func _open_aid() -> void:
+	if _opening_event: return
+	var transition := get_node("/root/ScreenTransition")
+	if transition.busy:
+		_aid_screen()
+		return
+	_opening_event = true
+	await transition.play(_aid_screen)
+	_opening_event = false
+
+func _aid_screen() -> void:
+	_clear_modal()
+	_modal_kind = "aid"
+	var page := AidScreen.new()
+	page.session = session
+	page.completed.connect(func() -> void: get_node("/root/ScreenTransition").play(func() -> void:
+		_clear_modal()
+		session.pending.erase("aid")
+		_start_floor()))
+	_modal = page
+	add_child(page)
 
 func _launch_battle() -> void:
 	if is_instance_valid(get_node("/root/EventManager").active): return
@@ -498,8 +523,8 @@ func _input(event: InputEvent) -> void:
 		_clear_modal()
 	elif _modal_kind == "training":
 		_show_pending()
-	elif _modal_kind == "event":
-		return # Events advance only through their choice/result buttons.
+	elif _modal_kind in ["event", "aid"]:
+		return # Events and aid advance only through their choice/result buttons.
 	elif _modal_kind == "node":
 		_clear_modal()
 	elif _modal_kind == "rest":

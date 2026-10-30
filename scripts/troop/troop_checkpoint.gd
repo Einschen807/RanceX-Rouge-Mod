@@ -48,7 +48,8 @@ static func valid(data: Dictionary, catalog: CardCatalog) -> bool:
 		for record: Variant in data.curses:
 			if not record is Dictionary or not record.get("name") is String or record.name.strip_edges().is_empty() or not record.get("description") is String or record.name in curse_names: return false
 			curse_names.append(record.name)
-	if data.has("max_hp_bonus") and not _integer(data.max_hp_bonus, 0): return false
+	# Negative since the Milli shop sells for troop rates.
+	if data.has("max_hp_bonus") and not _integer(data.max_hp_bonus, -2147483648): return false
 	if data.has("gold") and not _integer(data.gold, 0): return false
 	if catalog == null or not data.get("cards", null) is Array or not data.get("leaders", null) is Array: return false
 	if data.leaders.size() != 7 or not data.get("levels", null) is Dictionary or not data.get("bonuses", null) is Array: return false

@@ -3,11 +3,12 @@ class_name BattleAbilities
 const COUNTER_SKILL := 20210
 
 static func fresh_rules() -> Dictionary:
-	return {"assault": 0.0, "queen": 0, "counter": 0.0, "support_shield": 0.0, "echoes": []}
+	return {"assault": 0.0, "queen": 0, "counter": 0.0, "support_shield": 0.0, "down_shield": 0.0, "echoes": []}
 
-static func prepare(state: BattleState, actor: String, skill: Dictionary) -> void:
+## extra: releases owed by the skill itself (card enchantments such as 回响).
+static func prepare(state: BattleState, actor: String, skill: Dictionary, extra := 0) -> void:
 	var card := state.troop.catalog.find_name(actor)
-	var copies := int(state.ability_rules.queen) if int(card.get("faction", 0)) == 2 else 0
+	var copies := extra + (int(state.ability_rules.queen) if int(card.get("faction", 0)) == 2 else 0)
 	if int(skill.action) == 1 and int(skill.id) not in DesignedSkillEffects.ECHO:
 		for charge: Dictionary in state.ability_rules.echoes.duplicate():
 			copies += 1
@@ -70,12 +71,16 @@ static func description(state: BattleState, skill: Dictionary) -> String:
 		return "受到未被格挡的攻击伤害时\n发动攻击(%s倍)" % str(float(state.ability_rules.counter))
 	if id in DesignedSkillEffects.SUPPORT_SHIELD:
 		return "友方每生成1个支援\n合计获得%s%%护盾" % str(float(state.ability_rules.support_shield))
+	if id in DesignedSkillEffects.DOWN_SHIELD:
+		return "每有1名领队进入DOWN状态时\n合计获得%s%%护盾" % str(float(state.ability_rules.down_shield))
 	return String(skill.get("description", ""))
 
 static func valid_rules(data: Variant) -> bool:
 	if not data is Dictionary: return false
-	for key: String in ["assault", "queen", "counter", "support_shield"]:
-		if not TroopCheckpoint._number(data.get(key)) or not is_finite(float(data[key])) or float(data[key]) < 0.0: return false
+	for key: String in ["assault", "queen", "counter", "support_shield", "down_shield"]:
+		# Snapshots saved before 背水一战 existed have no down_shield entry.
+		var value: Variant = data.get(key, 0.0 if key == "down_shield" else null)
+		if not TroopCheckpoint._number(value) or not is_finite(float(value)) or float(value) < 0.0: return false
 	if not TroopCheckpoint._integer(data.queen, 0) or not data.get("echoes") is Array: return false
 	for charge: Variant in data.echoes:
 		if not charge is Dictionary or not TroopCheckpoint._integer(charge.get("remaining"), 1): return false

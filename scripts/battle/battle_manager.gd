@@ -17,7 +17,9 @@ var last_outcome := ""
 var _upgrade: CardUpgradeScreen
 var _upgrade_layer: CanvasLayer
 var _upgrade_battle_mode := Node.PROCESS_MODE_INHERIT
-## Card chests granted by relics (求人票); each opens once no other screen blocks it.
+## Queued type that opens a default-pool relic chest instead of a card chest.
+const RELIC_CHEST := -1
+## Chests granted by relics (求人票, 压箱底的宝物); each opens once no other screen blocks it.
 var _queued_treasures: Array[int] = []
 
 func queue_treasures(type: int, count: int) -> void:
@@ -29,7 +31,8 @@ func _process(_delta: float) -> void:
 	if _queued_treasures.is_empty(): return
 	if is_instance_valid(get_node("/root/ShopManager").active) or is_instance_valid(_relic_chest) or is_instance_valid(_treasure) or is_instance_valid(_upgrade) or is_instance_valid(active) or get_node("/root/ScreenTransition").busy: return
 	var type: int = _queued_treasures.pop_front()
-	launch_treasure(type)
+	if type == RELIC_CHEST: launch_relic()
+	else: launch_treasure(type)
 
 func upgrade_test_cards() -> String:
 	if is_instance_valid(active) or is_instance_valid(_upgrade) or is_instance_valid(_treasure) or is_instance_valid(_relic_chest) or is_instance_valid(get_node("/root/ShopManager").active):
@@ -51,24 +54,48 @@ func upgrade_test_cards() -> String:
 
 func launch_upgrade(count := 1, source: TroopState = null) -> String:
 	if count <= 0: return "用法：upgrade [正整数数量]"
-	if is_instance_valid(_upgrade) or is_instance_valid(_treasure) or is_instance_valid(_relic_chest) or get_node("/root/ScreenTransition").busy: return "当前界面不能强化卡牌。"
-	if get_tree().get_first_node_in_group("modal_overlay") != null and not get_node("/root/DebugConsole").panel.visible: return "请先关闭当前弹窗。"
-	if is_instance_valid(active) and (active.input_locked or is_instance_valid(active.formation) or active.battle.phase == "result"): return "请等待当前战斗操作结束。"
+	var refusal := _card_screen_refusal("强化")
+	if not refusal.is_empty(): return refusal
 	if source == null: source = current_troop()
 	if source == null or source.available.is_empty(): return "当前没有可强化的卡牌。"
+	var screen := CardUpgradeScreen.new()
+	screen.remaining = count
+	_open_card_screen(screen, source)
+	return "进入卡牌强化：%d次。" % count
+
+## requirement: event extension limiting which skills qualify (CardEnchantments.requirement_met).
+func launch_enchant(enchantment: String, source: TroopState = null, requirement: Dictionary = {}) -> String:
+	if not CardEnchantments.shared().by_name.has(enchantment): return "未找到附魔：" + enchantment
+	var refusal := _card_screen_refusal("附魔")
+	if not refusal.is_empty(): return refusal
+	if source == null: source = current_troop()
+	if source == null or source.available.is_empty(): return "当前没有可附魔的卡牌。"
+	if not source.available.any(func(card: Dictionary) -> bool: return not CardEnchantments.eligible_slots(source, card.name, requirement).is_empty()):
+		return "没有可附魔「%s」的卡牌。" % enchantment
+	var screen := CardEnchantScreen.new()
+	screen.enchantment = enchantment
+	screen.requirement = requirement
+	_open_card_screen(screen, source)
+	return "进入卡牌附魔：" + enchantment
+
+func _card_screen_refusal(action: String) -> String:
+	if is_instance_valid(_upgrade) or is_instance_valid(_treasure) or is_instance_valid(_relic_chest) or get_node("/root/ScreenTransition").busy: return "当前界面不能%s卡牌。" % action
+	if get_tree().get_first_node_in_group("modal_overlay") != null and not get_node("/root/DebugConsole").panel.visible: return "请先关闭当前弹窗。"
+	if is_instance_valid(active) and (active.input_locked or is_instance_valid(active.formation) or active.battle.phase == "result"): return "请等待当前战斗操作结束。"
+	return ""
+
+func _open_card_screen(screen: CardUpgradeScreen, source: TroopState) -> void:
 	if is_instance_valid(active):
 		_upgrade_battle_mode = active.process_mode
 		active.process_mode = Node.PROCESS_MODE_DISABLED
 	_upgrade_layer = CanvasLayer.new()
 	_upgrade_layer.layer = 95
 	add_child(_upgrade_layer)
-	_upgrade = CardUpgradeScreen.new()
+	_upgrade = screen
 	_upgrade.troop = source
-	_upgrade.remaining = count
 	_upgrade.completed.connect(_close_upgrade)
 	_upgrade.cancelled.connect(_close_upgrade)
 	_upgrade_layer.add_child(_upgrade)
-	return "进入卡牌强化：%d次。" % count
 
 func _close_upgrade() -> void:
 	_upgrade = null

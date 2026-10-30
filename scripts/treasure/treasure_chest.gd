@@ -8,6 +8,9 @@ var limit := 2
 var claimed := false
 var bias_before := 0
 var bias_after := 0
+## 希露的祈祷: one random roll per slot; taken cards get 回响 on a skill chosen by it.
+## 希露的祈祷: per offer, the skill slot that 回响 goes to when taken (-1 none); shown on the card faces.
+var echo_slots: Array[int] = []
 
 static func probabilities(type: int, bias: int) -> Array[int]:
 	if type == 3: return [0, 0, 100]
@@ -38,6 +41,8 @@ static func open(type: int, troop: TroopState, rng: RandomNumberGenerator, pools
 	var has_rare := chest.offers.any(func(card: Dictionary) -> bool: return int(card.rarity) == 3)
 	troop.rare_card_bias = 0 if has_rare else mini(100, troop.rare_card_bias + 1)
 	chest.bias_after = troop.rare_card_bias
+	if RelicEffects.claim_prayer(troop):
+		for offer: Dictionary in chest.offers: chest.echo_slots.append(RelicEffects.echo_slot(troop, offer.name, rng.randf()))
 	troop.changed.emit()
 	return chest
 
@@ -47,6 +52,7 @@ func claim_card(index: int, troop: TroopState) -> bool:
 	if selected.size() >= limit: return false
 	selected.append(index)
 	troop.acquire_card(offers[index].name)
+	if index < echo_slots.size(): RelicEffects.echo_card(troop, offers[index].name, echo_slots[index])
 	return true
 
 func finish() -> void:

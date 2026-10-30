@@ -4,10 +4,17 @@ var entry: LineEdit
 var output: RichTextLabel
 var history: Array[String] = []
 var history_index := 0
+## Completion list above the input line: ↓↑ select, Tab/click/Enter on a selection completes.
+var suggestions := ConsoleSuggestions.new()
+var suggestion_box: Panel
+var _matches: Array[Dictionary] = []
+var _selected := -1
+const SUGGESTION_ROWS := 6
+const SUGGESTION_HEIGHT := 31.0
 const HELP_TEXT := """可用命令：
 help — 显示全部命令
 travel — 切换自由移动，开启后可进入当前楼层任意节点
-shop — 打开商店
+shop [商店名] — 打开商店；shop 米莉 打开米莉的小店
 gold 数量 — 添加贝壳（正整数）
 pay 数量 — 支付贝壳（正整数，不足时失败）
 heal 百分比 — 恢复部队最大HP的1～100%
@@ -23,9 +30,12 @@ delet relic 遗物名称 — 删除持有遗物（也支持 delete relic）
 add card 卡牌名称 — 获得卡牌，首次重复强化，之后每次等级+5
 upgrade [数量] — 选择卡牌强化，默认1次
 upgrade test — 切换百科卡牌总览的全部卡牌强化，再次输入或退出总览后恢复
+upgrade initial — 直接强化持有的全部初始卡组卡牌（需在冒险中）
+enchantment 附魔名 — 选择1张卡牌的1个技能附魔（每张卡牌只能附魔一次）
+roulette 50|100|all — 赌场轮盘：押注50、100或全部贝壳，再选红／黑／绿
 add medal 数量 — 添加勋章（正整数）
 add curse 诅咒名称 — 获得 data/curses.txt 中的诅咒卡，已持有时不重复获得
-maxhp 百分比 — 最大HP增加1～100%（部队HP增加率）
+maxhp 百分比 — HP增加率提升1～100%
 """
 
 func _ready() -> void:
@@ -50,8 +60,23 @@ func _ready() -> void:
 	entry.size = Vector2(1872, 48)
 	entry.add_theme_font_override("font", CardWidget.CARD_TEXT_FONT)
 	entry.add_theme_font_size_override("font_size", 25)
-	entry.text_submitted.connect(execute)
+	entry.text_submitted.connect(_submit)
+	entry.text_changed.connect(func(_text: String) -> void: _refresh_suggestions())
 	frame.add_child(entry)
+	suggestion_box = Panel.new()
+	suggestion_box.name = "Suggestions"
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.05, 0.045, 0.04, 0.97)
+	style.border_color = Color(FormationArt.GOLD, 0.55)
+	style.set_border_width_all(1)
+	suggestion_box.add_theme_stylebox_override("panel", style)
+	suggestion_box.position = Vector2(24, 256)
+	suggestion_box.size = Vector2(1872, 0)
+	frame.add_child(suggestion_box)
+	suggestion_box.hide()
+	suggestions.owned_relics = func() -> Array:
+		var source: TroopState = get_node("/root/BattleManager").current_troop(false)
+		return source.relics if source != null else []
 	panel.hide()
 
 func toggle() -> void:
@@ -62,8 +87,68 @@ func toggle() -> void:
 		panel.add_to_group("modal_overlay")
 		entry.grab_focus()
 
+func _submit(command: String) -> void:
+	# Enter on a highlighted suggestion completes it; the next Enter runs the line.
+	if suggestion_box.visible and _selected >= 0:
+		_complete(_selected)
+		return
+	execute(command)
+
+func _refresh_suggestions() -> void:
+	_matches = suggestions.suggest(entry.text)
+	# Nothing left to complete when the line already equals the only candidate.
+	if _matches.size() == 1 and String(_matches[0].text).strip_edges() == entry.text.strip_edges(): _matches.clear()
+	_selected = -1
+	_draw_suggestions()
+
+func _draw_suggestions() -> void:
+	BattleArt.clear(suggestion_box)
+	if _matches.is_empty():
+		suggestion_box.hide()
+		return
+	var shown := mini(SUGGESTION_ROWS, _matches.size())
+	# Keep the highlighted row inside the visible window.
+	var first := clampi(_selected - shown + 1, 0, _matches.size() - shown) if _selected >= shown else 0
+	suggestion_box.size.y = shown * SUGGESTION_HEIGHT + 8.0
+	suggestion_box.position.y = 256.0 - suggestion_box.size.y
+	for row: int in range(shown):
+		var index := first + row
+		var match: Dictionary = _matches[index]
+		var button := Button.new()
+		button.position = Vector2(4, 4 + row * SUGGESTION_HEIGHT)
+		button.size = Vector2(suggestion_box.size.x - 8, SUGGESTION_HEIGHT)
+		button.focus_mode = Control.FOCUS_NONE
+		button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		var highlight := StyleBoxFlat.new()
+		highlight.bg_color = Color(FormationArt.GOLD, 0.22)
+		button.add_theme_stylebox_override("normal", highlight if index == _selected else StyleBoxEmpty.new())
+		button.add_theme_stylebox_override("hover", highlight)
+		button.add_theme_stylebox_override("pressed", highlight)
+		button.pressed.connect(_complete.bind(index))
+		suggestion_box.add_child(button)
+		var label := BattleArt.label(button, String(match.label), Vector2(10, 0), Vector2(900, SUGGESTION_HEIGHT), 21, FormationArt.GOLD if index == _selected else Color.WHITE)
+		label.add_theme_font_override("font", CardWidget.CARD_TEXT_FONT)
+		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var hint := BattleArt.label(button, String(match.hint), Vector2(920, 0), Vector2(button.size.x - 930, SUGGESTION_HEIGHT), 18, Color(0.68, 0.66, 0.62))
+		hint.add_theme_font_override("font", CardWidget.CARD_TEXT_FONT)
+		hint.clip_text = true
+		hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if _matches.size() > shown:
+		var count := BattleArt.label(suggestion_box, "%d/%d" % [maxi(_selected, 0) + 1, _matches.size()], Vector2(suggestion_box.size.x - 110, 4), Vector2(100, SUGGESTION_HEIGHT), 16, Color(0.68, 0.66, 0.62), HORIZONTAL_ALIGNMENT_RIGHT)
+		count.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	suggestion_box.show()
+
+func _complete(index: int) -> void:
+	if index < 0 or index >= _matches.size(): return
+	entry.text = String(_matches[index].text)
+	entry.caret_column = entry.text.length()
+	entry.grab_focus()
+	_refresh_suggestions()
+
 func close() -> void:
 	panel.hide()
+	_matches.clear()
+	suggestion_box.hide()
 	panel.remove_from_group("modal_overlay")
 	entry.release_focus()
 
@@ -74,6 +159,7 @@ func execute(command: String) -> void:
 	history_index = history.size()
 	output.append_text("> " + command + "\n")
 	entry.clear()
+	_refresh_suggestions()
 	var result := run_command(command)
 	output.append_text(result.message + "\n")
 	if result.ok and command.to_lower() != "help": close()
@@ -86,7 +172,7 @@ func run_command(command: String, context: Node = null) -> Dictionary:
 	var verb := split[0].to_lower()
 	var argument := split[1].strip_edges() if split.size() == 2 else ""
 	if verb != "help" and get_tree().get_first_node_in_group("card_upgrade_screen") != null:
-		return {"ok": false, "message": "请先完成或退出当前卡牌强化。"}
+		return {"ok": false, "message": "请先完成或退出当前卡牌强化／附魔。"}
 	var message := ""
 	var ok := false
 	match verb:
@@ -100,16 +186,28 @@ func run_command(command: String, context: Node = null) -> Dictionary:
 				message = "自由移动已开启：可进入当前楼层任意节点。" if enabled else "自由移动已关闭：恢复正常路线限制。"
 				ok = true
 		"shop":
-			message = get_node("/root/ShopManager").launch()
-			ok = message.begins_with("进入商店")
+			message = get_node("/root/ShopManager").launch(argument)
+			ok = message.begins_with("进入")
 		"upgrade":
 			if argument.to_lower() == "test":
 				message = get_node("/root/BattleManager").upgrade_test_cards()
 				ok = message.begins_with("卡牌总览临时强化")
+			elif argument.to_lower() == "initial":
+				message = _upgrade_initial()
+				ok = message.begins_with("初始卡组已强化")
 			else:
 				var count := 1 if argument.is_empty() else (int(argument) if argument.is_valid_int() else 0)
 				message = get_node("/root/BattleManager").launch_upgrade(count, context.troop if context != null else null)
 				ok = message.begins_with("进入卡牌强化")
+		"enchantment":
+			if argument.is_empty(): message = "用法：enchantment 附魔名"
+			else:
+				message = get_node("/root/BattleManager").launch_enchant(argument, context.troop if context != null else null)
+				ok = message.begins_with("进入卡牌附魔")
+		"roulette":
+			var source: TroopState = context.troop if context != null else get_node("/root/BattleManager").current_troop()
+			message = get_node("/root/EventManager").launch_roulette(argument.to_lower(), source)
+			ok = message.begins_with("开始轮盘")
 		"battle":
 			message = get_node("/root/BattleManager").launch(argument)
 			ok = message.begins_with("进入战斗")
@@ -140,9 +238,9 @@ func run_command(command: String, context: Node = null) -> Dictionary:
 			if source == null: message = "部队数据加载失败。"
 			elif argument.is_valid_int() and int(argument) > 0 and int(argument) <= 100:
 				source.add_max_hp_bonus(int(argument))
-				message = "最大生命增加%d%%。" % int(argument)
+				message = "HP增加率提升%d%%。" % int(argument)
 				ok = true
-			else: message = "用法：maxhp 1～100（最大HP增加百分比）"
+			else: message = "用法：maxhp 1～100（HP增加率提升百分比）"
 		"choose":
 			var args := argument.split(" ", false, 1)
 			if args.size() == 2 and args[0].to_lower() == "relic":
@@ -208,6 +306,17 @@ func run_command(command: String, context: Node = null) -> Dictionary:
 			message = "未知命令或参数不完整，输入 help 查看全部命令。"
 	return {"ok": ok, "message": message}
 
+## Upgrades every owned card of data/initial_deck.txt that still has a + version.
+func _upgrade_initial() -> String:
+	var session := get_node("/root/RunSession")
+	if not session.active or session.troop == null: return "upgrade initial 需在冒险中使用。"
+	var upgraded: PackedStringArray = []
+	for name: String in session.pools.initial_cards:
+		var owned: String = session.troop.owned_version(name)
+		if owned != name or session.troop.catalog.find_name(name + CardCatalog.UPGRADE_SUFFIX).is_empty(): continue
+		if session.troop.upgrade_card(owned): upgraded.append(name + CardCatalog.UPGRADE_SUFFIX)
+	return "初始卡组已强化：" + "、".join(upgraded) if not upgraded.is_empty() else "初始卡组没有可强化的卡牌。"
+
 func _input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo and (event.keycode in [KEY_QUOTELEFT, KEY_ASCIITILDE] or event.physical_keycode == KEY_QUOTELEFT):
 		get_viewport().set_input_as_handled()
@@ -215,7 +324,19 @@ func _input(event: InputEvent) -> void:
 	elif panel.visible:
 		if event.is_action_pressed("ui_cancel"):
 			get_viewport().set_input_as_handled()
-			close()
+			# Back closes the completion list first, then the console.
+			if suggestion_box.visible:
+				_matches.clear()
+				suggestion_box.hide()
+			else: close()
+		elif suggestion_box.visible and event is InputEventKey and event.pressed and event.keycode == KEY_TAB:
+			get_viewport().set_input_as_handled()
+			_complete(maxi(_selected, 0))
+		elif suggestion_box.visible and event is InputEventKey and event.pressed and event.keycode in [KEY_UP, KEY_DOWN]:
+			get_viewport().set_input_as_handled()
+			# ↓ moves down the list from its best match; ↑ back to the top returns to plain typing.
+			_selected = clampi(_selected + (1 if event.keycode == KEY_DOWN else -1), -1, _matches.size() - 1)
+			_draw_suggestions()
 		elif event is InputEventKey and event.pressed and event.keycode in [KEY_UP, KEY_DOWN]:
 			get_viewport().set_input_as_handled()
 			history_index = clampi(history_index + (-1 if event.keycode == KEY_UP else 1), 0, history.size())

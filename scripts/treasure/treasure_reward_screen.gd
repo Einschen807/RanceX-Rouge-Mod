@@ -63,6 +63,7 @@ func _ready() -> void:
 		slots.append(slot)
 		var record: Dictionary = chest.offers[i]
 		var card := CardWidget.new()
+		if i < chest.echo_slots.size() and chest.echo_slots[i] >= 0: card.preview_enchantments = {chest.echo_slots[i]: CardEnchantments.ECHO}
 		card.setup(record, troop, false, 0)
 		card.set_meta("omit_unavailable", true)
 		card.set_meta("omit_down", true)

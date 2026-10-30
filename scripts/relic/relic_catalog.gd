@@ -1,7 +1,8 @@
 extends RefCounted
 class_name RelicCatalog
 ## 5 特殊: obtained only through dedicated commands or events, never drawn from a pool.
-const RARITIES := ["普通", "罕见", "稀有", "商店", "特殊"]
+## 6 援助: aid-person relics (data/aids.txt), likewise never drawn from a pool.
+const RARITIES := ["普通", "罕见", "稀有", "商店", "特殊", "援助"]
 var entries: Array[Dictionary] = []
 var by_name: Dictionary = {}
 var pools: Dictionary = {}
@@ -21,7 +22,7 @@ func load_catalog(path := "res://data/relics.txt", pool_path := "res://data/reli
 		if row.size() != 4 or not row[0] is String or not row[1] is String or not RecordTable.integer(row[2]) or not row[3] is String:
 			errors.append("遗物记录应为名称、图标、稀有度、描述")
 			continue
-		if row[0].is_empty() or by_name.has(row[0]) or int(row[2]) not in [1, 2, 3, 4, 5] or not ResourceLoader.exists("res://assets/relics/%s.png" % row[1]):
+		if row[0].is_empty() or by_name.has(row[0]) or int(row[2]) not in [1, 2, 3, 4, 5, 6] or not ResourceLoader.exists("res://assets/relics/%s.png" % row[1]):
 			errors.append("遗物名称、稀有度或图标无效：" + row[0])
 			continue
 		# Same convention as skill descriptions: a lowercase r is a line break.

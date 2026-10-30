@@ -31,6 +31,11 @@ func _draw() -> void:
 		var rectangle := Rect2(Vector2(x, y), Vector2(width, height) * fit)
 		if glyph.is_valid_int():
 			draw_texture_rect_region(atlas, rectangle, Rect2(int(glyph) * width, 0, width, height))
+		elif glyph == "-":
+			# The sheets have no minus: lay the straight middle of the sheet's own "1" on its side.
+			draw_set_transform(rectangle.get_center(), PI * 0.5, Vector2(0.5, 0.62))
+			draw_texture_rect_region(atlas, Rect2(-rectangle.size * 0.5, rectangle.size), Rect2(width, height * 0.3, width, height * 0.4))
+			draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 		elif glyph in ["%", "张"] and suffix != null:
 			draw_texture_rect(suffix, rectangle, false)
 		elif glyph in ["万", "亿", "兆"]:

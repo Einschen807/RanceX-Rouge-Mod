@@ -15,15 +15,21 @@ const HOVER_GROW := 0.025
 const MARKS := {"【": ["】", FormationArt.GOLD], "〔": ["〕", RED], "〈": ["〉", BLUE], "〖": ["〗", WAVE]}
 const WAVE_EFFECT := preload("res://scripts/event/event_wave_effect.gd")
 var description := ""
+## Optional picture left of the text (aid choices); item art is cropped to its visible pixels.
+var icon_texture: Texture2D
+const ICON_SIZE := 64.0
 ## Horizontal draw offset used by the entrance slide; containers keep the real position.
 var shift := 0.0:
 	set(value):
 		shift = value
+		var lead := ICON_SIZE + 18.0 if icon_texture != null else 0.0
 		if is_instance_valid(_label):
-			_label.offset_left = 38 + value
+			_label.offset_left = 38 + lead + value
 			_label.offset_right = -46 + value
+		if is_instance_valid(_icon): _icon.position = Vector2(30 + value, (size.y - ICON_SIZE) * 0.5)
 		queue_redraw()
 var _label: RichTextLabel
+var _icon: TextureRect
 var _hover := 0.0
 var _hover_tween: Tween
 
@@ -45,6 +51,21 @@ func _ready() -> void:
 	_label.add_theme_constant_override("line_separation", 2)
 	add_shadow(_label)
 	add_child(_label)
+	if icon_texture != null:
+		_icon = TextureRect.new()
+		_icon.name = "OptionIcon"
+		var bounds := Rect2(Vector2.ZERO, icon_texture.get_size())
+		var image := icon_texture.get_image()
+		if image != null: bounds = Rect2(image.get_used_rect()).grow(4).intersection(bounds)
+		var cropped := AtlasTexture.new()
+		cropped.atlas = icon_texture
+		cropped.region = bounds
+		_icon.texture = cropped
+		_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		_icon.size = Vector2.ONE * ICON_SIZE
+		_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(_icon)
 	shift = shift
 	var lines := description.split("\n", true, 1)
 	_label.push_color(FormationArt.GOLD)
@@ -55,7 +76,7 @@ func _ready() -> void:
 		append_marked(_label, lines[1])
 	resized.connect(func() -> void:
 		pivot_offset = size * 0.5
-		queue_redraw())
+		shift = shift)
 	# The mouse moves focus with it, so only one bar is ever lit; keyboard focus still works.
 	mouse_entered.connect(func() -> void:
 		if not disabled: grab_focus())

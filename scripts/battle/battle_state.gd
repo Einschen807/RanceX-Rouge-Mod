@@ -17,6 +17,8 @@ var next_support_uid := 1
 var pending_support_skills: Array[Dictionary] = []
 var pending_support_feedback: Array[Dictionary] = []
 var enemy_down := false
+## Player leaders that fully left the field by DOWN this battle (automatic replacement only).
+var down_exits := 0
 var locked_targets: Array[String] = []
 var doushin_target_count := 1
 var preparation_checkpoint: Dictionary = {}
@@ -103,6 +105,7 @@ func configure(state: TroopState, monsters: MonsterCatalog, identity: String) ->
 	pending_support_feedback.clear()
 	pending_relic_actions.clear()
 	pending_down_replacements.clear()
+	down_exits = 0
 	abilities.clear()
 	ability_rules = BattleAbilities.fresh_rules()
 	center_boost_enabled = false
@@ -242,6 +245,7 @@ func context(side: String, card: Dictionary = {}) -> Dictionary:
 	result.last_friendly_skill = last_friendly_skill
 	result.enemy_kind = int(monster.kind)
 	result.assault_bonus = float(ability_rules.assault) if side == "player" else 0.0
+	result.down_exits = down_exits if side == "player" else 0
 	# Availability here is independent of AP affordability and skill conditions.
 	var other_actionable := 0
 	if side == "player" and not has_status("player", BattleStatusEffects.SLEEP):
@@ -295,7 +299,7 @@ func prepare_player_skill(name: String, id: int, slot: int = -1) -> Dictionary:
 	if swap_was_available:
 		next_swap_round = round + swap_interval()
 	BattleLeaderPowers.prepare(self, "player", effective_skill(skill, result.commands), result.commands)
-	BattleAbilities.prepare(self, name, skill)
+	BattleAbilities.prepare(self, name, skill, runtime.enchantment_repeats(name, skill, slot))
 	log_message("%s 使用 %s" % [name, BattleSkillLog.skill_name(self, skill, result.commands)])
 	_prepare_accuracy("player", result.commands, skill, int(card_element(name)))
 	return result
@@ -447,7 +451,7 @@ func prepare_automatic_skill(actor: String, id: int, slot: int) -> Dictionary:
 	var result := runtime.use_skill(actor, skill, context("player", card), slot)
 	if result.get("ok", false):
 		BattleLeaderPowers.prepare(self, "player", skill, result.commands)
-		BattleAbilities.prepare(self, actor, skill)
+		BattleAbilities.prepare(self, actor, skill, runtime.enchantment_repeats(actor, skill, slot))
 		_prepare_accuracy("player", result.commands, skill, int(card.element))
 	return result
 
@@ -744,6 +748,9 @@ func down_leaders(side: String, selector: int, actor_slot: int) -> void:
 		leader_powers.player.erase(actor)
 		troop.retired_characters[troop.catalog.find_name(actor).identity] = true
 		log_message("%s DOWN" % actor)
+		# 背水一战: each leader entering DOWN grants the stacked shield percent.
+		if float(ability_rules.down_shield) > 0.0 and BattleShields.add(self, "player", float(ability_rules.down_shield)) > 0.0:
+			log_message("能力发动：背水一战（获得%s%%护盾）" % BattleSkillLog.number(float(ability_rules.down_shield)))
 	BattleDoushinTargets.sync(self)
 
 func _replace_down_leaders() -> void:
@@ -770,6 +777,7 @@ func _replace_down_leaders() -> void:
 		if animate_automatic_skills and not replacement.is_empty():
 			pending_down_replacements.append({"slot": slot, "previous": old_name, "actor": replacement})
 		log_message("%s退场，%s自动上场" % [old_name, replacement])
+		down_exits += 1
 		replaced = true
 	if replaced:
 		troop.changed.emit()

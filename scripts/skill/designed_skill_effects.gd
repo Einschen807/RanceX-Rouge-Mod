@@ -9,6 +9,8 @@ const ECHO := [20076, 20078]
 const LAST_LEADER := [20156, 20158]
 const MIMIC := [20332, 20334]
 const CENTER_BOOST := [20313, 20315]
+## 背水一战: shield whenever a leader enters DOWN.
+const DOWN_SHIELD := [20445, 20447]
 
 static func can_use(id: int, context: Dictionary) -> bool:
 	if id in LAST_LEADER: return int(context.get("other_actionable_leaders", 0)) == 0
@@ -17,6 +19,8 @@ static func can_use(id: int, context: Dictionary) -> bool:
 static func attack_bonus(id: int, context: Dictionary) -> float:
 	match id:
 		20300, 20302: return floor((float(context.get("shield_percent", 0.0)) + 0.000001) / 5.0) * (0.7 if id == 20302 else 0.5)
+		# 恶魔之镰: per leader that fully exited by DOWN this battle.
+		20440, 20442: return float(context.get("down_exits", 0)) * (0.4 if id == 20442 else 0.3)
 		20033: return float(context.get("combo", 0)) * 0.5
 		20035: return float(context.get("combo", 0)) * 0.7
 		20084: return floor(float(context.get("gold", 0)) / 50.0)
@@ -28,6 +32,7 @@ static func resolve(id: int, context: Dictionary) -> Array[Dictionary]:
 	if id in QUEEN: return [{"kind": "battle_ability", "rule": "queen", "amount": 1}]
 	if id in COUNTER: return [{"kind": "battle_ability", "rule": "counter", "amount": 1.0 if id == 20061 else 1.5}]
 	if id in SUPPORT_SHIELD: return [{"kind": "battle_ability", "rule": "support_shield", "amount": 3 if id == 20073 else 4}]
+	if id in DOWN_SHIELD: return [{"kind": "battle_ability", "rule": "down_shield", "amount": 3 if id == 20445 else 4}]
 	if id in ECHO: return [{"kind": "next_skill_echo", "count": 1 if id == 20076 else 2}]
 	match id:
 		20320, 20322: return [{"kind": "restore_ap", "amount": 1}]
@@ -51,7 +56,7 @@ static func resolve(id: int, context: Dictionary) -> Array[Dictionary]:
 		20143, 20151:
 			# Resolve from the pre-cast context, before the first configuration runs.
 			var supports: Array = context.get("player_supports", [])
-			if not supports.any(func(support: Dictionary) -> bool: return support.get("identity", "") == "魔法阵"):
+			if not supports.any(func(support: Dictionary) -> bool: return support.get("identity", "") == "魔方阵"):
 				return [{"kind": "support_add", "support": 30, "target": "self"}]
 		20152, 20154:
 			var statuses: Array = context.get("enemy_statuses", [])

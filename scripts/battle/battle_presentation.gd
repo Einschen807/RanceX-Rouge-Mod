@@ -190,15 +190,31 @@ func automatic_actions() -> void:
 		if prepared.get("ok", false): await action(entry.actor, entry.id, false, entry.slot, prepared)
 	view.battle.pending_automatic_skills.clear()
 
+## Relics fire in acquisition order. Attack relics animate one by one; a run of neighbouring
+## support relics, or of effect relics, resolves at once (still in order, so a full status
+## bar refuses the later ones) with their icons flashing together.
 func relic_actions() -> void:
-	while not view.battle.pending_relic_actions.is_empty() and view.battle.phase == "player":
-		var entry: Dictionary = view.battle.pending_relic_actions.pop_front()
-		if entry.id == 0:
-			RelicEffects.execute(view.battle, entry)
+	var queue: Array[Dictionary] = view.battle.pending_relic_actions
+	while not queue.is_empty() and view.battle.phase == "player":
+		var entry: Dictionary = queue.pop_front()
+		var kind := RelicEffects.category(view.battle, entry)
+		if kind == "attack":
+			var prepared := RelicEffects.prepare(view.battle, entry)
+			if prepared.get("ok", false): await action(entry.name, entry.id, false, -1, prepared)
 			continue
-		var prepared := RelicEffects.prepare(view.battle, entry)
-		if prepared.get("ok", false): await action(entry.name, entry.id, false, -1, prepared)
-	view.battle.pending_relic_actions.clear()
+		var batch: Array[Dictionary] = [entry]
+		while not queue.is_empty() and RelicEffects.category(view.battle, queue[0]) == kind: batch.append(queue.pop_front())
+		await relic_batch(batch, kind)
+	queue.clear()
+
+func relic_batch(batch: Array[Dictionary], kind: String) -> void:
+	for entry: Dictionary in batch:
+		if view.battle.phase != "player": break
+		RelicEffects.execute(view.battle, entry)
+	# New supports chime through their own pop-in feedback; effects share one cue.
+	if kind == "effect": _sound("res://assets/audio/status_add.ogg")
+	await support_feedback()
+	await view._wait_animation(0.6)
 
 func support_actions(side: String) -> void:
 	while not view.battle.pending_support_skills.is_empty() and view.battle.phase == side:

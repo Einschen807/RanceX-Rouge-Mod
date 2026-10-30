@@ -43,6 +43,10 @@ func _load_catalogs() -> bool:
 	if not pools.load_catalog(catalog, monsters):
 		error = "\n".join(pools.errors)
 		return false
+	var aids := AidCatalog.new()
+	if not aids.load_catalog():
+		error = "\n".join(aids.errors)
+		return false
 	return true
 
 func _load_data() -> bool:
@@ -237,6 +241,28 @@ func choose_event_option(index: int) -> Dictionary:
 	changed.emit()
 	return result
 
+## Floor-entrance aid: same locking and result rules as event options.
+func choose_aid_option(index: int) -> Dictionary:
+	if pending.get("type") != "ancient" or not pending.has("aid") or pending.get("aid_resolved", false):
+		return {"ok": false, "message": "援助选项已执行。"}
+	var options: Array = pending.aid.options
+	if index < 0 or index >= options.size(): return {"ok": false, "message": "援助选项不存在。"}
+	if not options[index].get("unavailable", "").is_empty(): return {"ok": false, "message": options[index].unavailable}
+	pending["aid_resolved"] = true
+	pending["aid_choice"] = index
+	pending["aid_executing"] = true
+	var entrance: Dictionary = pending
+	var result: Dictionary = await EventCommands.execute(options[index].command, self)
+	if not active or defeated or pending != entrance: return result
+	pending.erase("aid_executing")
+	if not result.ok and result.get("completed", 0) == 0:
+		pending.erase("aid_resolved")
+		pending.erase("aid_choice")
+	else:
+		pending["aid_result"] = result.message
+	changed.emit()
+	return result
+
 func hp() -> float:
 	return maxf(0.0, troop.total("hp") - missing_hp)
 
@@ -281,6 +307,11 @@ func enter(id: String) -> bool:
 	elif type == "unknown":
 		pending["event"] = pools.event_catalog.draw(event_pool(), hp(), troop.total("hp"), troop.gold, seen_events, autosave.rng)
 		if not pending.event.is_empty(): current_event()
+	elif type == "ancient":
+		# A floor's first entrance may bring an aid person; the drawn choices are saved with it.
+		var aids := AidCatalog.shared()
+		var person := aids.person_for_floor(act + 1, autosave.rng)
+		if not person.is_empty(): pending["aid"] = aids.draw(person, troop, autosave.rng)
 	elif type == "chest":
 		pending["medals"] = 2
 	elif type == "shop":

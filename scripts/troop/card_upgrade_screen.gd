@@ -51,10 +51,18 @@ func _ready() -> void:
 	_formation.upgrade_selection = true
 	_formation.upgrade_selected.connect(select_card)
 	_formation.close_requested.connect(request_back)
+	_configure_formation()
 	add_child(_formation)
 	_remaining_label = BattleArt.label(_formation, "", Vector2(1555, 660), Vector2(350, 105), 25, FormationArt.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
 	_remaining_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_refresh_remaining()
+
+## Subclasses (enchanting) adjust the selection list before it builds its cards.
+func _configure_formation() -> void:
+	pass
+
+func _action_name() -> String:
+	return "强化"
 
 func _refresh_remaining() -> void:
 	_remaining_label.text = "强化卡牌\n剩余 %d 次" % remaining
@@ -363,8 +371,8 @@ func request_back() -> void:
 	panel.size = Vector2(1000, 400)
 	panel.add_theme_stylebox_override("panel", BattleArt.panel_style())
 	_overlay.add_child(panel)
-	BattleArt.label(_overlay, "退出强化", Vector2(535, 343), Vector2(850, 40), 30, FormationArt.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
-	var text := "你还剩%d次强化卡牌没有选择，确认要退出吗？" % remaining
+	BattleArt.label(_overlay, "退出" + _action_name(), Vector2(535, 343), Vector2(850, 40), 30, FormationArt.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+	var text := "你还剩%d次%s卡牌没有选择，确认要退出吗？" % [remaining, _action_name()]
 	if rest_mode:
 		text = "你还剩%d次强化没有使用，\n退出后将返还本次所有的强化选择，是否要退出？" % remaining
 	var body := BattleArt.label(_overlay, text, Vector2(535, 432), Vector2(850, 150), 30, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER)

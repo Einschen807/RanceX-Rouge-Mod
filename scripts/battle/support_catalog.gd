@@ -6,6 +6,19 @@ const MAX_COUNT := 7
 var entries: Dictionary = {}
 var errors: PackedStringArray = []
 
+## Support IDs a skill configures (effects 30/31 and custom configuration), in order, without repeats.
+## Custom effects resolve with an empty pre-battle context, as the encyclopedia sees them.
+static func configured_by(skill: Dictionary) -> Array[int]:
+	var result: Array[int] = []
+	if skill.is_empty(): return result
+	var commands: Array[Dictionary] = []
+	for n: int in range(1, 4):
+		if int(skill["effect%d" % n]) in [30, 31]: commands.append({"kind": "support_add", "support": int(skill["value%d" % n])})
+	if int(skill.get("custom", 0)) == 1: commands.append_array(SkillCustomEffects.resolve(int(skill.id), {}))
+	for command: Dictionary in commands:
+		if command.get("kind", "") == "support_add" and int(command.support) not in result: result.append(int(command.support))
+	return result
+
 func load_catalog(skills: Dictionary, path := "res://data/supports.txt") -> bool:
 	entries.clear()
 	errors.clear()

@@ -13,13 +13,18 @@ var pools := TreasurePoolCatalog.new()
 var _body: Control
 var _row: OriginalUiButton
 var _gold_row: OriginalUiButton
+var _medal_row: OriginalUiButton
 var _empty: Label
 var _row_motion: Tween
 var _leaders: Control
 var gold_reward := 0
 var bonus_gold := 0
 var gold_claimed := false
+var medal_reward := 0
+var medal_claimed := false
 const GOLD_RANGES := {1: Vector2i(5, 10), 2: Vector2i(15, 25), 3: Vector2i(50, 60)}
+## Elite victories always drop one medal.
+const MEDAL_REWARDS := {2: 1}
 ## Native loot panel art is 612x572. Its middle is cut out (keeping the side
 ## borders and the centred emblem undistorted) for a taller, narrower panel.
 const ART := preload("res://assets/treasure/loot_panel.png")
@@ -58,6 +63,16 @@ func _ready() -> void:
 		gold_reward = rng.randi_range(limits.x, limits.y) + maxi(0, bonus_gold)
 		_gold_row = _loot_row("ShellReward", "%d 贝壳" % gold_reward, "点击领取", _claim_gold)
 		ShopArt.shell(_gold_row.content, Vector2(30, 14), Vector2(58, 64))
+		medal_reward = MEDAL_REWARDS.get(pool_id, 0)
+	if medal_reward > 0:
+		_medal_row = _loot_row("MedalReward", "%d 勋章" % medal_reward, "点击领取", _claim_medal)
+		var medal := TextureRect.new()
+		medal.texture = load("res://assets/map/medal.png")
+		medal.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		medal.position = Vector2(26, 10)
+		medal.size = Vector2(72, 72)
+		medal.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_medal_row.content.add_child(medal)
 	_empty = BattleArt.label(_body, "搜刮完成", _panel_at + Vector2(0, 150), Vector2(PANEL_SIZE.x, 100), 30, FormationArt.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
 	_empty.name = "LootComplete"
 	_layout_rows(false)
@@ -96,7 +111,10 @@ func _build_panel() -> void:
 		panel.add_child(slice)
 
 func _row_target(index: int) -> Vector2:
-	return _panel_at + Vector2((PANEL_SIZE.x - ROW_SIZE.x) / 2.0, ROW_TOP + 108 * index)
+	# Three rows (elite medal) sit slightly tighter so the last clears the Continue button.
+	var step := 100.0 if is_instance_valid(_medal_row) else 108.0
+	var top := ROW_TOP - 12.0 if is_instance_valid(_medal_row) else ROW_TOP
+	return _panel_at + Vector2((PANEL_SIZE.x - ROW_SIZE.x) / 2.0, top + step * index)
 
 func _loot_row(node_name: String, title: String, hint: String, callback: Callable) -> OriginalUiButton:
 	var row := OriginalUiButton.make(_body, "formation", _row_target(0), ROW_SIZE, callback, "click", "res://assets/map/native")
@@ -111,11 +129,11 @@ func _play_entrance() -> void:
 	# The panel fades in, rows slide in one after another, leaders rise from the bottom.
 	var tween := create_tween().set_parallel(true)
 	for item: CanvasItem in _body.get_children():
-		if item == _row or item == _gold_row: continue
+		if item == _row or item == _gold_row or item == _medal_row: continue
 		item.modulate.a = 0.0
 		tween.tween_property(item, "modulate:a", 1.0, 0.3).set_delay(0.08)
 	var order := 0
-	for row: OriginalUiButton in [_gold_row, _row]:
+	for row: OriginalUiButton in [_gold_row, _medal_row, _row]:
 		if not is_instance_valid(row) or not row.visible: continue
 		var x := row.position.x
 		row.modulate.a = 0.0
@@ -174,6 +192,9 @@ func _layout_rows(animated := true) -> void:
 	if is_instance_valid(_gold_row):
 		_gold_row.visible = not gold_claimed
 		if _gold_row.visible: remaining.append(_gold_row)
+	if is_instance_valid(_medal_row):
+		_medal_row.visible = not medal_claimed
+		if _medal_row.visible: remaining.append(_medal_row)
 	_row.visible = chest == null or not chest.claimed
 	if _row.visible: remaining.append(_row)
 	for index: int in range(remaining.size()):
@@ -189,6 +210,12 @@ func _claim_gold() -> void:
 	gold_claimed = true
 	_layout_rows()
 	troop.add_gold(gold_reward)
+
+func _claim_medal() -> void:
+	if medal_claimed or _finished or is_instance_valid(reward): return
+	medal_claimed = true
+	_layout_rows()
+	troop.add_medals(medal_reward)
 
 func _open_chest() -> void:
 	if is_instance_valid(reward) or _finished: return
